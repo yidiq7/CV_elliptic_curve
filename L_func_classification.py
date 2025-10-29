@@ -21,6 +21,9 @@ TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
 REAL_DATA_PATH = 'combined_twisted_arrays.npy'
 FAKE_DATA_PATH = 'combined_twisted_arrays_fake.npy'
 
+# Class imbalance ratio (fake:real = 10:1)
+CLASS_WEIGHT_RATIO = 10.0
+
 
 # --- 2. Data Loading and Preprocessing ---
 
@@ -35,6 +38,10 @@ except FileNotFoundError as e:
     print(f"Error loading data: {e}")
     print("Please make sure the .npy files are in the same directory as the script.")
     exit()
+
+print(f"Real data shape: {real_data_mmap.shape}")
+print(f"Fake data shape: {fake_data_mmap.shape}")
+print(f"Class imbalance ratio (fake:real): {len(fake_data_mmap)/len(real_data_mmap):.1f}:1")
 
 # --- 3. PyTorch Dataset and DataLoaders ---
 
@@ -141,26 +148,90 @@ model = LFunctionCNN().to(DEVICE)
 print("\nModel Architecture:")
 print(model)
 
-# --- 5. Training and Validation ---
+# --- 5. Helper function for calculating metrics ---
 
-# Loss function and optimizer
-criterion = nn.BCEWithLogitsLoss() # Numerically stable for binary classification
+def calculate_metrics(predictions, labels):
+    """
+    Efficient calculation of precision, recall, and F1 scores for binary classification.
+    Uses vectorized operations to compute confusion matrix in one pass.
+    """
+    # Keep computations on the same device as inputs
+    device = predictions.device
+    
+    # Ensure tensors are 1D (flatten if needed)
+    y_true = labels.flatten().long()
+    y_pred = predictions.flatten().long()
+    
+    # Create unique indices for each confusion matrix cell
+    # This maps: (true=0,pred=0)→0, (true=0,pred=1)→1, (true=1,pred=0)→2, (true=1,pred=1)→3
+    indices = 2 * y_true + y_pred
+    
+    # Count occurrences of each combination using bincount
+    cm = torch.bincount(indices, minlength=4)
+    tn, fp, fn, tp = cm[0].item(), cm[1].item(), cm[2].item(), cm[3].item()
+    
+    # Compute all metrics using the confusion matrix values
+    # Use epsilon to avoid division by zero
+    eps = 1e-7
+    
+    # Metrics for Real class (label=1)
+    precision_real = tp / (tp + fp + eps)
+    recall_real = tp / (tp + fn + eps)
+    f1_real = 2 * (precision_real * recall_real) / (precision_real + recall_real + eps)
+    
+    # Metrics for Fake class (label=0)
+    precision_fake = tn / (tn + fn + eps)
+    recall_fake = tn / (tn + fp + eps)
+    f1_fake = 2 * (precision_fake * recall_fake) / (precision_fake + recall_fake + eps)
+    
+    # Overall accuracy
+    total = tp + tn + fp + fn
+    accuracy = (tp + tn) / (total + eps)
+    
+    return {
+        'accuracy': accuracy,
+        'precision_real': precision_real,
+        'recall_real': recall_real,
+        'f1_real': f1_real,
+        'precision_fake': precision_fake,
+        'recall_fake': recall_fake,
+        'f1_fake': f1_fake,
+        'confusion_matrix': {
+            'tp': tp,
+            'tn': tn,
+            'fp': fp,
+            'fn': fn
+        }
+    }
+
+# --- 6. Training and Validation ---
+
+# Loss function with class weight and optimizer
+# pos_weight gives weight to positive class (real data, label=1)
+# Since we have 10x more fake data, we weight the real class by 10
+pos_weight = torch.tensor([CLASS_WEIGHT_RATIO]).to(DEVICE)
+criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-
+print(f"\nUsing weighted BCE loss with pos_weight={CLASS_WEIGHT_RATIO} to handle class imbalance")
 print("\nStarting training...")
+print("-" * 100)
+print(f"{'Epoch':^7} | {'Loss':^8} | {'Train P(Real)':^13} | {'Train R(Real)':^13} | {'Train F1(Real)':^14} | {'Val P(Real)':^11} | {'Val R(Real)':^11} | {'Val F1(Real)':^12}")
+print("-" * 100)
+
 start_time = time.time()
 
-best_val_accuracy = 0.0
+best_val_f1_real = 0.0
 best_model_state = None
 
 for epoch in range(EPOCHS):
     # --- Training phase ---
     model.train()
     running_loss = 0.0
-    # ADDED: Initialize counters for training accuracy
-    train_total_correct = 0
-    train_total_samples = 0
+    
+    # Collect all predictions and labels for metric calculation
+    all_train_preds = []
+    all_train_labels = []
     
     for features, labels in train_loader:
         labels = labels.squeeze(1)
@@ -174,50 +245,63 @@ for epoch in range(EPOCHS):
         
         running_loss += loss.item()
 
-        # ADDED: Calculate training accuracy for the batch
-        with torch.no_grad(): # No need to track gradients for accuracy calculation
+        # Collect predictions for metric calculation
+        with torch.no_grad():
             preds = torch.round(torch.sigmoid(outputs))
-            train_total_correct += (preds == labels).sum().item()
-            train_total_samples += labels.size(0)
+            all_train_preds.append(preds)
+            all_train_labels.append(labels)
+
+    # Concatenate all predictions and labels
+    all_train_preds = torch.cat(all_train_preds)
+    all_train_labels = torch.cat(all_train_labels)
+    
+    # Calculate training metrics
+    train_metrics = calculate_metrics(all_train_preds, all_train_labels)
 
     # --- Validation phase ---
     model.eval()
-    val_total_correct = 0
-    val_total_samples = 0
+    all_val_preds = []
+    all_val_labels = []
+    
     with torch.no_grad():
         for features, labels in val_loader:
             labels = labels.squeeze(1)
             features, labels = features.to(DEVICE), labels.to(DEVICE)
             outputs = model(features)
             preds = torch.round(torch.sigmoid(outputs))
-            val_total_correct += (preds == labels).sum().item()
-            val_total_samples += labels.size(0)
+            all_val_preds.append(preds)
+            all_val_labels.append(labels)
+    
+    # Concatenate all predictions and labels
+    all_val_preds = torch.cat(all_val_preds)
+    all_val_labels = torch.cat(all_val_labels)
+    
+    # Calculate validation metrics
+    val_metrics = calculate_metrics(all_val_preds, all_val_labels)
 
     # --- Epoch Summary ---
     avg_train_loss = running_loss / len(train_loader)
-    train_accuracy = train_total_correct / train_total_samples # ADDED
-    val_accuracy = val_total_correct / val_total_samples
     
-    # MODIFIED: Updated print statement
-    print(f"Epoch [{epoch+1}/{EPOCHS}] | Train Loss: {avg_train_loss:.4f} | Train Acc: {train_accuracy:.4f} | Val Acc: {val_accuracy:.4f}")
+    # Print metrics (focusing on Real class as it's the minority class)
+    print(f"{epoch+1:^7} | {avg_train_loss:^8.4f} | {train_metrics['precision_real']:^13.4f} | {train_metrics['recall_real']:^13.4f} | {train_metrics['f1_real']:^14.4f} | {val_metrics['precision_real']:^11.4f} | {val_metrics['recall_real']:^11.4f} | {val_metrics['f1_real']:^12.4f}")
 
-    if val_accuracy > best_val_accuracy:
-        best_val_accuracy = val_accuracy
-        best_model_state = model.state_dict().copy() # Use .copy() to avoid saving a reference
-        print(f"  -> New best model saved with validation accuracy: {best_val_accuracy:.4f}")
+    # Save best model based on validation F1 score for Real class
+    if val_metrics['f1_real'] > best_val_f1_real:
+        best_val_f1_real = val_metrics['f1_real']
+        best_model_state = model.state_dict().copy()
+        print(f"  -> New best model saved with validation F1(Real): {best_val_f1_real:.4f}")
         
 end_time = time.time()
+print("-" * 100)
 print(f"\nTraining finished in {(end_time - start_time):.2f} seconds.")
 
-# --- You can now save the trained model if desired ---
+# --- Save the trained model ---
 torch.save(model.state_dict(), 'L_function_classifier.pth')
 print("\nModel saved to L_function_classifier.pth")
 
-
-
-# --- ADDED: Confusion Matrix Calculation ---
+# --- Final Evaluation with Confusion Matrix ---
 print("\n" + "="*50)
-print("VALIDATION SET CONFUSION MATRIX")
+print("FINAL VALIDATION SET EVALUATION")
 print("="*50)
 
 # Load best model state for final evaluation
@@ -227,11 +311,9 @@ if best_model_state is not None:
 
 model.eval()
 
-# Initialize confusion matrix components
-true_positives = 0  # Real correctly classified as Real (label=1, pred=1)
-true_negatives = 0  # Fake correctly classified as Fake (label=0, pred=0)
-false_positives = 0 # Fake incorrectly classified as Real (label=0, pred=1)
-false_negatives = 0 # Real incorrectly classified as Fake (label=1, pred=0)
+# Collect all predictions for final evaluation
+all_final_preds = []
+all_final_labels = []
 
 with torch.no_grad():
     for features, labels in val_loader:
@@ -240,44 +322,35 @@ with torch.no_grad():
         
         outputs = model(features)
         preds = torch.round(torch.sigmoid(outputs))
-        
-        # Calculate confusion matrix components
-        for pred, label in zip(preds, labels):
-            if label == 1 and pred == 1:
-                true_positives += 1
-            elif label == 0 and pred == 0:
-                true_negatives += 1
-            elif label == 0 and pred == 1:
-                false_positives += 1
-            elif label == 1 and pred == 0:
-                false_negatives += 1
+        all_final_preds.append(preds)
+        all_final_labels.append(labels)
+
+# Concatenate and calculate final metrics
+all_final_preds = torch.cat(all_final_preds)
+all_final_labels = torch.cat(all_final_labels)
+final_metrics = calculate_metrics(all_final_preds, all_final_labels)
 
 # Print confusion matrix
+cm = final_metrics['confusion_matrix']
 print("\nConfusion Matrix:")
 print("                 Predicted")
 print("                 Fake  Real")
-print(f"Actual Fake    [{true_negatives:5d} {false_positives:5d}]")
-print(f"       Real    [{false_negatives:5d} {true_positives:5d}]")
+print(f"Actual Fake    [{cm['tn']:5d} {cm['fp']:5d}]")
+print(f"       Real    [{cm['fn']:5d} {cm['tp']:5d}]")
 
-# Calculate and print metrics
-total = true_positives + true_negatives + false_positives + false_negatives
-accuracy = (true_positives + true_negatives) / total if total > 0 else 0
-
-# Precision, Recall, F1 for Real class (label=1)
-precision_real = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
-recall_real = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
-f1_real = 2 * (precision_real * recall_real) / (precision_real + recall_real) if (precision_real + recall_real) > 0 else 0
-
-# Precision, Recall, F1 for Fake class (label=0)
-precision_fake = true_negatives / (true_negatives + false_negatives) if (true_negatives + false_negatives) > 0 else 0
-recall_fake = true_negatives / (true_negatives + false_positives) if (true_negatives + false_positives) > 0 else 0
-f1_fake = 2 * (precision_fake * recall_fake) / (precision_fake + recall_fake) if (precision_fake + recall_fake) > 0 else 0
-
+# Print detailed metrics
 print("\n" + "-"*50)
 print("Summary Statistics:")
-print(f"Total validation samples: {total}")
-print(f"Overall accuracy: {accuracy:.4f}")
-print("\nPer-class metrics:")
-print(f"Fake (0): Precision={precision_fake:.4f}, Recall={recall_fake:.4f}, F1={f1_fake:.4f}")
-print(f"Real (1): Precision={precision_real:.4f}, Recall={recall_real:.4f}, F1={f1_real:.4f}")
+print(f"Total validation samples: {len(all_final_labels)}")
+print(f"Overall accuracy: {final_metrics['accuracy']:.4f}")
+print(f"\nPer-class metrics:")
+print(f"Fake (0): Precision={final_metrics['precision_fake']:.4f}, Recall={final_metrics['recall_fake']:.4f}, F1={final_metrics['f1_fake']:.4f}")
+print(f"Real (1): Precision={final_metrics['precision_real']:.4f}, Recall={final_metrics['recall_real']:.4f}, F1={final_metrics['f1_real']:.4f}")
 print("-"*50)
+
+# Print class distribution in validation set
+real_count = (all_final_labels == 1).sum().item()
+fake_count = (all_final_labels == 0).sum().item()
+print(f"\nValidation set class distribution:")
+print(f"Real samples: {real_count} ({real_count/len(all_final_labels)*100:.1f}%)")
+print(f"Fake samples: {fake_count} ({fake_count/len(all_final_labels)*100:.1f}%)")
