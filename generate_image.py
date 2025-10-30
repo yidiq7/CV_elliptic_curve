@@ -9,11 +9,11 @@ import csv
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
-SIZE = 100
+SIZE = 200
 GENERATE_REAL = False
 GENERATE_FAKE = True
 
-primes = np.array([sympy.prime(i) for i in range(1, 101)])  # primes[0] = 2, primes[99] = 541
+primes = np.array([sympy.prime(i) for i in range(1, SIZE+1)])  # primes[0] = 2, primes[99] = 541
 
 with open("chifull.txt", "r") as f:
     chifull_str = f.read().strip()
@@ -26,7 +26,7 @@ complex_pattern = r'(-?\s*[\w\s\+\-\*\/\(\)]+zeta\d+(\*\*\d+)?[\w\s\+\-\*\/\(\)]
 chifull_str = re.sub(complex_pattern, lambda m: '"' + m.group(0).strip() + '"', chifull_str)
 # --- Step 3: Parse the string into a Python list ---
 chifull = ast.literal_eval(chifull_str)
-print('length of chifull', len(chifull[33]))
+print('length of chifull', len(chifull))
 # --- Step 4: Define a function to convert zeta to exp(2 pi i / N) ---
 def getroot(n, exponent=1):
     """
