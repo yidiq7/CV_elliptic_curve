@@ -3,27 +3,28 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split, ConcatDataset
+from torch.amp import autocast, GradScaler
 import time
 
 # --- 1. Configuration and Hyperparameters ---
-
 # Decide which device to use (GPU if available, otherwise CPU)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {DEVICE}")
 
 # Hyperparameters
 LEARNING_RATE = 0.004
-BATCH_SIZE = 128 # Increased for A100 GPU performance
-EPOCHS = 100 # This task might converge quickly, 15 is a solid starting point
+BATCH_SIZE = 256
+EPOCHS = 150
 TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
 
 # File paths for your data
-REAL_DATA_PATH = 'combined_twisted_arrays.npy'
-FAKE_DATA_PATH = 'combined_twisted_arrays_fake.npy'
+IMAGE_SIZE = 200
+REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
+FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
 
 # Class imbalance ratio (fake:real = 10:1)
-CLASS_WEIGHT_RATIO = 10.0
-
+CLASS_WEIGHT_RATIO = 3.0
+OPTIMAL_THRESHOLD = 0.5
 
 # --- 2. Data Loading and Preprocessing ---
 
@@ -92,8 +93,8 @@ train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], 
 
 # Create DataLoaders
 # The DataLoader will handle shuffling the combined dataset
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE*10, shuffle=False, num_workers=8, pin_memory=True, persistent_workers=True)
 
 print(f"Created {len(train_dataset)} training samples and {len(val_dataset)} validation samples.")
 print("Data is being loaded from disk in batches, not all at once.")
@@ -127,7 +128,12 @@ class LFunctionCNN(nn.Module):
             nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2) # Output: (128, 6, 6)
+            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (128, 6, 6)
+
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)  # Output: (512, 6, 6)
         )
 
         self.classifier = nn.Sequential(
@@ -147,6 +153,8 @@ class LFunctionCNN(nn.Module):
 model = LFunctionCNN().to(DEVICE)
 print("\nModel Architecture:")
 print(model)
+
+scaler = GradScaler('cuda')
 
 # --- 5. Helper function for calculating metrics ---
 
@@ -213,18 +221,22 @@ pos_weight = torch.tensor([CLASS_WEIGHT_RATIO]).to(DEVICE)
 criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-print(f"\nUsing weighted BCE loss with pos_weight={CLASS_WEIGHT_RATIO} to handle class imbalance")
+print(f"\nUsing weighted BCE loss with pos_weight={pos_weight} to handle class imbalance")
 print("\nStarting training...")
-print("-" * 100)
-print(f"{'Epoch':^7} | {'Loss':^8} | {'Train P(Real)':^13} | {'Train R(Real)':^13} | {'Train F1(Real)':^14} | {'Val P(Real)':^11} | {'Val R(Real)':^11} | {'Val F1(Real)':^12}")
-print("-" * 100)
+print("-" * 120)
+print(f"{'Epoch':^7} | {'Loss':^8} | {'Train P(Real)':^13} | {'Train R(Real)':^13} | {'Train F1(Real)':^14} | {'Val P(Real)':^11} | {'Val R(Real)':^11} | {'Val F1(Real)':^12} | {'Train Time':^11}")
+print("-" * 120)
 
 start_time = time.time()
 
 best_val_f1_real = 0.0
 best_model_state = None
+#best_model_state = torch.load('best_model.pth')
 
 for epoch in range(EPOCHS):
+
+    epoch_start_time = time.time()
+
     # --- Training phase ---
     model.train()
     running_loss = 0.0
@@ -238,6 +250,13 @@ for epoch in range(EPOCHS):
         features, labels = features.to(DEVICE), labels.to(DEVICE)
         
         optimizer.zero_grad()
+        #with autocast('cuda'):  # Use mixed precision
+        #    outputs = model(features)
+        #    loss = criterion(outputs, labels)
+
+        #scaler.scale(loss).backward()
+        #scaler.step(optimizer)
+        #scaler.update()
         outputs = model(features)
         loss = criterion(outputs, labels)
         loss.backward()
@@ -279,11 +298,17 @@ for epoch in range(EPOCHS):
     # Calculate validation metrics
     val_metrics = calculate_metrics(all_val_preds, all_val_labels)
 
+    # Synchronize CUDA before measuring time
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+    epoch_time = time.time() - epoch_start_time
+    
     # --- Epoch Summary ---
     avg_train_loss = running_loss / len(train_loader)
     
     # Print metrics (focusing on Real class as it's the minority class)
-    print(f"{epoch+1:^7} | {avg_train_loss:^8.4f} | {train_metrics['precision_real']:^13.4f} | {train_metrics['recall_real']:^13.4f} | {train_metrics['f1_real']:^14.4f} | {val_metrics['precision_real']:^11.4f} | {val_metrics['recall_real']:^11.4f} | {val_metrics['f1_real']:^12.4f}")
+    print(f"{epoch+1:^7} | {avg_train_loss:^8.4f} | {train_metrics['precision_real']:^13.4f} | {train_metrics['recall_real']:^13.4f} | {train_metrics['f1_real']:^14.4f} | {val_metrics['precision_real']:^11.4f} | {val_metrics['recall_real']:^11.4f} | {val_metrics['f1_real']:^12.4f} | {epoch_time:^12.4f}")
 
     # Save best model based on validation F1 score for Real class
     if val_metrics['f1_real'] > best_val_f1_real:
@@ -309,48 +334,51 @@ if best_model_state is not None:
     model.load_state_dict(best_model_state)
     print("Loaded best model for final evaluation")
 
-model.eval()
+for OPTIMAL_THRESHOLD in (0.3, 0.5, 0.7, 0.9):
+    model.eval()
 
-# Collect all predictions for final evaluation
-all_final_preds = []
-all_final_labels = []
+    # Collect all predictions for final evaluation
+    all_final_preds = []
+    all_final_labels = []
 
-with torch.no_grad():
-    for features, labels in val_loader:
-        labels = labels.squeeze(1)
-        features, labels = features.to(DEVICE), labels.to(DEVICE)
-        
-        outputs = model(features)
-        preds = torch.round(torch.sigmoid(outputs))
-        all_final_preds.append(preds)
-        all_final_labels.append(labels)
+    with torch.no_grad():
+        for features, labels in val_loader:
+            labels = labels.squeeze(1)
+            features, labels = features.to(DEVICE), labels.to(DEVICE)
+            
+            outputs = model(features)
+            probs = torch.sigmoid(outputs)
+            preds = (probs > OPTIMAL_THRESHOLD).float()
+            #preds = torch.round(torch.sigmoid(outputs))
+            all_final_preds.append(preds)
+            all_final_labels.append(labels)
 
-# Concatenate and calculate final metrics
-all_final_preds = torch.cat(all_final_preds)
-all_final_labels = torch.cat(all_final_labels)
-final_metrics = calculate_metrics(all_final_preds, all_final_labels)
+    # Concatenate and calculate final metrics
+    all_final_preds = torch.cat(all_final_preds)
+    all_final_labels = torch.cat(all_final_labels)
+    final_metrics = calculate_metrics(all_final_preds, all_final_labels)
 
-# Print confusion matrix
-cm = final_metrics['confusion_matrix']
-print("\nConfusion Matrix:")
-print("                 Predicted")
-print("                 Fake  Real")
-print(f"Actual Fake    [{cm['tn']:5d} {cm['fp']:5d}]")
-print(f"       Real    [{cm['fn']:5d} {cm['tp']:5d}]")
+    # Print confusion matrix
+    cm = final_metrics['confusion_matrix']
+    print("\nConfusion Matrix:")
+    print("                 Predicted")
+    print("                 Fake  Real")
+    print(f"Actual Fake    [{cm['tn']:5d} {cm['fp']:5d}]")
+    print(f"       Real    [{cm['fn']:5d} {cm['tp']:5d}]")
 
-# Print detailed metrics
-print("\n" + "-"*50)
-print("Summary Statistics:")
-print(f"Total validation samples: {len(all_final_labels)}")
-print(f"Overall accuracy: {final_metrics['accuracy']:.4f}")
-print(f"\nPer-class metrics:")
-print(f"Fake (0): Precision={final_metrics['precision_fake']:.4f}, Recall={final_metrics['recall_fake']:.4f}, F1={final_metrics['f1_fake']:.4f}")
-print(f"Real (1): Precision={final_metrics['precision_real']:.4f}, Recall={final_metrics['recall_real']:.4f}, F1={final_metrics['f1_real']:.4f}")
-print("-"*50)
+    # Print detailed metrics
+    print("\n" + "-"*50)
+    print("Summary Statistics:")
+    print(f"Total validation samples: {len(all_final_labels)}")
+    print(f"Overall accuracy: {final_metrics['accuracy']:.4f}")
+    print(f"\nPer-class metrics:")
+    print(f"Fake (0): Precision={final_metrics['precision_fake']:.4f}, Recall={final_metrics['recall_fake']:.4f}, F1={final_metrics['f1_fake']:.4f}")
+    print(f"Real (1): Precision={final_metrics['precision_real']:.4f}, Recall={final_metrics['recall_real']:.4f}, F1={final_metrics['f1_real']:.4f}")
+    print("-"*50)
 
-# Print class distribution in validation set
-real_count = (all_final_labels == 1).sum().item()
-fake_count = (all_final_labels == 0).sum().item()
-print(f"\nValidation set class distribution:")
-print(f"Real samples: {real_count} ({real_count/len(all_final_labels)*100:.1f}%)")
-print(f"Fake samples: {fake_count} ({fake_count/len(all_final_labels)*100:.1f}%)")
+    # Print class distribution in validation set
+    real_count = (all_final_labels == 1).sum().item()
+    fake_count = (all_final_labels == 0).sum().item()
+    print(f"\nValidation set class distribution:")
+    print(f"Real samples: {real_count} ({real_count/len(all_final_labels)*100:.1f}%)")
+    print(f"Fake samples: {fake_count} ({fake_count/len(all_final_labels)*100:.1f}%)")

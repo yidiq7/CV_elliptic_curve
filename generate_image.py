@@ -9,8 +9,8 @@ import csv
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
-SIZE = 200
-GENERATE_REAL = False
+SIZE = 300
+GENERATE_REAL = True 
 GENERATE_FAKE = True
 
 primes = np.array([sympy.prime(i) for i in range(1, SIZE+1)])  # primes[0] = 2, primes[99] = 541
@@ -21,13 +21,11 @@ with open("chifull.txt", "r") as f:
 chifull_str = chifull_str.replace("^", "**")
 
 # Step 2b: Wrap complex expressions with quotes
-# This pattern looks for any expression containing zeta followed by operations or exponents
 complex_pattern = r'(-?\s*[\w\s\+\-\*\/\(\)]+zeta\d+(\*\*\d+)?[\w\s\+\-\*\/\(\)]*)'
 chifull_str = re.sub(complex_pattern, lambda m: '"' + m.group(0).strip() + '"', chifull_str)
-# --- Step 3: Parse the string into a Python list ---
 chifull = ast.literal_eval(chifull_str)
 print('length of chifull', len(chifull))
-# --- Step 4: Define a function to convert zeta to exp(2 pi i / N) ---
+
 def getroot(n, exponent=1):
     """
     Compute the nth root of unity raised to the given exponent.
@@ -38,147 +36,144 @@ def convert_zeta_to_exp(expr):
     """
     Converts zeta expressions to exp(2 pi i / N) and applies the exponent if necessary.
     """
-    # Match patterns like -zeta22, zeta22**2, or -zeta22**5
     pattern = re.compile(r'(-?)zeta(\d+)(\*\*(\d+))?')
 
-    # Replace each match with exp(2 pi i / N)^k while preserving the sign
     def replace_match(match):
-        sign = match.group(1)  # Capture the minus sign if present
-        n = int(match.group(2))  # Extract the order of the root
-        exponent = int(match.group(4)) if match.group(4) else 1  # Default exponent is 1
-
-        # Build the Python expression for the nth root of unity
+        sign = match.group(1)
+        n = int(match.group(2))
+        exponent = int(match.group(4)) if match.group(4) else 1
         root_expr = f"({sign}getroot({n}, {exponent}))"
         return root_expr
 
-    # Replace all occurrences of zeta terms in the expression
     expr_transformed = pattern.sub(replace_match, expr)
     return expr_transformed
-
-# --- Step 5: Evaluate the expressions ---
 
 def evaluate_expression(expr):
     """
     Safely evaluate a math expression with numpy and getroot.
     """
     try:
-        # Convert zeta expressions to Python-compatible format
         expr_transformed = convert_zeta_to_exp(expr)
-        # Evaluate the resulting expression
         result = eval(expr_transformed, {"getroot": getroot, "np": np})
         return result
     except Exception as e:
         print(f"Error evaluating expression: {expr}\n{e}")
         return expr
 
-# --- Step 6: Recursively replace and evaluate tokens in the list ---
-
 def replace_and_evaluate(expr):
     if isinstance(expr, list):
         return [replace_and_evaluate(item) for item in expr]
     elif isinstance(expr, str):
-        # Apply zeta-to-exp transformation and evaluate
         return evaluate_expression(expr)
     return expr
 
-# --- Step 7: Apply the transformation and evaluation ---
 allchi = replace_and_evaluate(chifull)
-
-
 
 padchi = np.array([
     [allchi[k][m % len(allchi[k])] for m in range(SIZE)]
     for k in range(SIZE)  
 ])
 
-re_padchi = padchi.real  # 100x100
-im_padchi = padchi.imag  # 100x100
+re_padchi = padchi.real
+im_padchi = padchi.imag
+
+# Precompute denominator to avoid redundant calculations
+sqrt_primes = 2 * np.sqrt(primes)
 
 def twisted_image_from_ap(ap):
-    factor = np.array(ap[:SIZE]) / (2 * np.sqrt(primes))  # Shape (100,)
-    r = 0.5 - 0.5 * factor[:, None] * re_padchi  # Shape (100, 100)
+    factor = np.array(ap[:SIZE]) / sqrt_primes
+    r = 0.5 - 0.5 * factor[:, None] * re_padchi
     g = 0.5 * np.ones(re_padchi.shape)
-    b = 0.5 - 0.5 * factor[:, None] * im_padchi  # Shape (100, 100)
-
-    # Stack into 100x100x3 RGB array
+    b = 0.5 - 0.5 * factor[:, None] * im_padchi
     img_array = np.stack([r, g, b], axis=2)
-
     return img_array
 
 os.makedirs("./coloured", exist_ok=True)
 
 if GENERATE_REAL:
-
     aplist = []
     with open('ap.csv', 'r') as csvfile:
         reader = csv.reader(csvfile)
-
-        # Skip the header row
         header = next(reader)
-
         for row in reader:
             conductor = int(row[0])
             rank = int(row[1])
             aps = ast.literal_eval(row[2]) 
-
             aplist.append([conductor, rank, aps])
 
-    all_img_arrays = []
+    # Write directly to .npy file using memory-mapped array
+    num_curves = len(aplist)
+    combined_array = np.lib.format.open_memmap(
+        f"combined_twisted_arrays_{SIZE}.npy",
+        mode='w+',
+        dtype=np.float64,
+        shape=(num_curves, SIZE, SIZE, 3)
+    )
 
-    for i, curve in enumerate(aplist):
-        ap = curve[2][:SIZE]  # Take first 100 a_p values from 1000
-        # Conductor Cut
-        # if curve[0] > 1000:
-        #     break
+    for i, curve in enumerate(tqdm(aplist, desc="Processing real curves", unit="curve")):
+        ap = curve[2][:SIZE]
         img_array = twisted_image_from_ap(ap)
-        # Save before clipping and rounding
-        all_img_arrays.append(img_array)
-        # Clip to [0, 1] (Hasse bound |a_p| ≤ 2√p ensures reasonable values)
-        img_array = np.clip(img_array, 0, 1)
-        # Scale to [0, 255] and convert to uint8
-        img_array = (img_array * 255).astype(np.uint8)
-        #breakpoint()
-        img = Image.fromarray(img_array, 'RGB')
-        #img.save(f"./coloured/ECcoloured{i+1}.png")
-        #print(f"Saved ./coloured/ECcoloured{i+1}.png")
+        combined_array[i] = img_array
+        
+        # Optional: save individual images
+        # img_array_clipped = np.clip(img_array, 0, 1)
+        # img_array_uint8 = (img_array_clipped * 255).astype(np.uint8)
+        # img = Image.fromarray(img_array_uint8, 'RGB')
+        # img.save(f"./coloured/ECcoloured{i+1}.png")
+
+    # Flush to disk
+    del combined_array
+    print(f"\nSaved {num_curves} real curves to 'combined_twisted_arrays.npy'")
 
 
-    combined_array = np.stack(all_img_arrays)
-    print(f"\nCombined all arrays into a single array with shape: {combined_array.shape}")
-
-    np.save("combined_twisted_arrays.npy", combined_array)
-    print("\nSaved the combined array to 'combined_twisted_arrays.npy'")
-
-
-# --- Generate the dataset for the fake a_ps ---
 if GENERATE_FAKE:
+    # Count rows first to pre-allocate memory-mapped array
+    with open('fake_ap.csv', 'r', newline='') as f:
+        num_rows = sum(1 for _ in f)
+    
+    print(f"Loaded {num_rows} rows from fake_ap.csv")
 
-    aplist = []
+    # Create memory-mapped array
+    combined_array_fake = np.lib.format.open_memmap(
+        f"combined_twisted_arrays_fake_{SIZE}.npy",
+        mode='w+',
+        dtype=np.float64,
+        shape=(num_rows, SIZE, SIZE, 3)
+    )
+
+    # Process in batches to control memory usage
+    BATCH_SIZE = 1000
+    
     with open('fake_ap.csv', 'r', newline='') as f:
         reader = csv.reader(f)
-        for row in reader:
-            # Convert each string in the row back to an integer
+        batch = []
+        batch_start_idx = 0
+        
+        for i, row in enumerate(tqdm(reader, total=num_rows, desc="Processing fake curves", unit="row")):
             integer_row = [int(value) for value in row]
-            aplist.append(integer_row)
+            batch.append(integer_row)
+            
+            # Process batch when full or at end of file
+            if len(batch) >= BATCH_SIZE or i == num_rows - 1:
+                # Process batch in parallel
+                num_processes = min(cpu_count(), len(batch))
+                chunk_size = max(1, len(batch) // (num_processes * 4))
+                
+                with Pool(processes=num_processes) as pool:
+                    batch_results = list(pool.imap(
+                        twisted_image_from_ap, 
+                        batch, 
+                        chunksize=chunk_size
+                    ))
+                
+                # Write batch to memory-mapped array
+                batch_end_idx = batch_start_idx + len(batch)
+                combined_array_fake[batch_start_idx:batch_end_idx] = np.array(batch_results)
+                
+                # Clear batch
+                batch = []
+                batch_start_idx = batch_end_idx
 
-    print(f"Loaded {len(aplist)} rows from fake_ap.csv")
-
-    all_img_arrays = []
-
-    num_processes = min(cpu_count(), len(aplist))
-    chunk_size = max(1, len(aplist) // (num_processes * 10))
-
-    with Pool(processes=num_processes) as pool:
-        all_img_arrays = list(tqdm(
-            pool.imap(twisted_image_from_ap, aplist, chunksize=chunk_size),
-            total=len(aplist),
-            desc="Processing a_p rows",
-            unit="row",
-            smoothing=0.1
-        ))
-
-    combined_array_fake = np.stack(all_img_arrays)
-    print(f"\nCombined all arrays into a single array with shape: {combined_array_fake.shape}")
-
-    np.save("combined_twisted_arrays_fake.npy", combined_array_fake)
-    print("\nSaved the combined array to 'combined_twisted_arrays_fake.npy'")
+    # Flush to disk
+    del combined_array_fake
+    print(f"\nSaved {num_rows} fake curves to 'combined_twisted_arrays_fake.npy'")
