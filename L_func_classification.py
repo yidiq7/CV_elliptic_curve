@@ -60,16 +60,9 @@ class LFunctionDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # 1. Get the raw data slice
-        raw_feature = self.data[idx]
-        
-        # 2. Remove the constant middle channel
-        feature_sliced = raw_feature[:, :, [0, 2]]
-        
-        # 3. Convert to torch tensor and permute dimensions
-        feature_tensor = torch.FloatTensor(feature_sliced).permute(2, 0, 1)
-        
-        # 4. Create the label
+        feature = self.data[idx]
+        feature_tensor = torch.FloatTensor(feature).permute(2, 0, 1)
+        # Create the label
         label_tensor = torch.FloatTensor([self.label]).unsqueeze(0)
         
         return feature_tensor, label_tensor
