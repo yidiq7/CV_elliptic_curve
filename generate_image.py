@@ -9,7 +9,7 @@ import csv
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
-SIZE = 300
+SIZE = 200
 GENERATE_REAL = True 
 GENERATE_FAKE = True
 
@@ -109,8 +109,8 @@ if GENERATE_REAL:
     combined_array = np.lib.format.open_memmap(
         f"combined_twisted_arrays_{SIZE}.npy",
         mode='w+',
-        dtype=np.float64,
-        shape=(num_curves, SIZE, SIZE, 3)
+        dtype=np.float32,
+        shape=(num_curves, SIZE, SIZE, 2)
     )
 
     for i, curve in enumerate(tqdm(aplist, desc="Processing real curves", unit="curve")):
@@ -140,7 +140,7 @@ if GENERATE_FAKE:
     combined_array_fake = np.lib.format.open_memmap(
         f"combined_twisted_arrays_fake_{SIZE}.npy",
         mode='w+',
-        dtype=np.float64,
+        dtype=np.float32,
         shape=(num_rows, SIZE, SIZE, 2)
     )
 
