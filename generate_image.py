@@ -88,7 +88,7 @@ def twisted_image_from_ap(ap, rgb=False):
     if rgb:
         img_array = np.stack([r, g, b], axis=2)
     else:
-    img_array = np.stack([r, b], axis=2)
+        img_array = np.stack([r, b], axis=2)
     return img_array
 
 os.makedirs("./coloured", exist_ok=True)
