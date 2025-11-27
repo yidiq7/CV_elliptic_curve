@@ -12,7 +12,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {DEVICE}")
 
 # Hyperparameters
-LEARNING_RATE = 0.004
+LEARNING_RATE = 0.001
 BATCH_SIZE = 256
 EPOCHS = 150
 TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
@@ -26,12 +26,13 @@ FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
 CLASS_WEIGHT_RATIO = 3.0
 OPTIMAL_THRESHOLD = 0.5
 
+# Resume training configuration
+RESUME_TRAINING = True  # Set to False to start fresh
+
 # --- 2. Data Loading and Preprocessing ---
 
 print("Loading and preprocessing data using memory-mapping...")
 
-# --- CHANGE 2: Load arrays using mmap_mode ---
-# This does NOT load the data into RAM. It creates a pointer to the file on disk.
 try:
     real_data_mmap = np.load(REAL_DATA_PATH, mmap_mode='r')
     fake_data_mmap = np.load(FAKE_DATA_PATH, mmap_mode='r')
@@ -59,9 +60,6 @@ class LFunctionDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # --- CHANGE 3: Slicing and processing happens here, on-the-fly ---
-        # Only this single item is loaded from disk into RAM.
-        
         # 1. Get the raw data slice
         raw_feature = self.data[idx]
         
@@ -76,7 +74,6 @@ class LFunctionDataset(Dataset):
         
         return feature_tensor, label_tensor
 
-# --- CHANGE 4: Create two separate datasets and combine them ---
 real_dataset = LFunctionDataset(real_data_mmap, label_value=1)
 fake_dataset = LFunctionDataset(fake_data_mmap, label_value=0)
 
@@ -221,6 +218,32 @@ pos_weight = torch.tensor([CLASS_WEIGHT_RATIO]).to(DEVICE)
 criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
+# --- Load checkpoint if it exists ---
+START_EPOCH = 0
+best_val_f1_real = 0.0
+best_model_state = None
+
+if RESUME_TRAINING:
+    try:
+        checkpoint = torch.load('L_function_classifier_checkpoint.pth', map_location=DEVICE)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        START_EPOCH = checkpoint['epoch']
+        best_val_f1_real = checkpoint['best_val_f1_real']
+        best_model_state = checkpoint['model_state_dict']
+        print(f"\nResumed training from epoch {START_EPOCH}")
+        print(f"Best validation F1(Real) so far: {best_val_f1_real:.4f}")
+    except FileNotFoundError:
+        print("\nNo checkpoint found. Starting training from scratch.")
+        START_EPOCH = 0
+        best_val_f1_real = 0.0
+        best_model_state = None
+else:
+    print("\nStarting training from scratch.")
+    START_EPOCH = 0
+    best_val_f1_real = 0.0
+    best_model_state = None
+
 print(f"\nUsing weighted BCE loss with pos_weight={pos_weight} to handle class imbalance")
 print("\nStarting training...")
 print("-" * 120)
@@ -229,11 +252,7 @@ print("-" * 120)
 
 start_time = time.time()
 
-best_val_f1_real = 0.0
-best_model_state = None
-#best_model_state = torch.load('best_model.pth')
-
-for epoch in range(EPOCHS):
+for epoch in range(START_EPOCH, START_EPOCH + EPOCHS):
 
     epoch_start_time = time.time()
 
@@ -320,9 +339,15 @@ end_time = time.time()
 print("-" * 100)
 print(f"\nTraining finished in {(end_time - start_time):.2f} seconds.")
 
-# --- Save the trained model ---
-torch.save(model.state_dict(), 'L_function_classifier.pth')
-print("\nModel saved to L_function_classifier.pth")
+# --- Save the trained model with checkpoint ---
+checkpoint = {
+    'epoch': START_EPOCH + EPOCHS,
+    'model_state_dict': best_model_state if best_model_state is not None else model.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+    'best_val_f1_real': best_val_f1_real,
+}
+torch.save(checkpoint, 'L_function_classifier_checkpoint.pth')
+print("\nCheckpoint saved to L_function_classifier_checkpoint.pth")
 
 # --- Final Evaluation with Confusion Matrix ---
 print("\n" + "="*50)

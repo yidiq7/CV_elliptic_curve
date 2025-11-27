@@ -80,12 +80,15 @@ im_padchi = padchi.imag
 # Precompute denominator to avoid redundant calculations
 sqrt_primes = 2 * np.sqrt(primes)
 
-def twisted_image_from_ap(ap):
+def twisted_image_from_ap(ap, rgb=False):
     factor = np.array(ap[:SIZE]) / sqrt_primes
     r = 0.5 - 0.5 * factor[:, None] * re_padchi
     g = 0.5 * np.ones(re_padchi.shape)
     b = 0.5 - 0.5 * factor[:, None] * im_padchi
-    img_array = np.stack([r, g, b], axis=2)
+    if rgb:
+        img_array = np.stack([r, g, b], axis=2)
+    else:
+    img_array = np.stack([r, b], axis=2)
     return img_array
 
 os.makedirs("./coloured", exist_ok=True)
@@ -138,7 +141,7 @@ if GENERATE_FAKE:
         f"combined_twisted_arrays_fake_{SIZE}.npy",
         mode='w+',
         dtype=np.float64,
-        shape=(num_rows, SIZE, SIZE, 3)
+        shape=(num_rows, SIZE, SIZE, 2)
     )
 
     # Process in batches to control memory usage
