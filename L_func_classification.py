@@ -14,11 +14,11 @@ print(f"Using device: {DEVICE}")
 # Hyperparameters
 LEARNING_RATE = 0.001
 BATCH_SIZE = 256
-EPOCHS = 150
+EPOCHS = 10
 TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
 
 # File paths for your data
-IMAGE_SIZE = 200
+IMAGE_SIZE = 500
 REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
 FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
 
@@ -27,13 +27,15 @@ CLASS_WEIGHT_RATIO = 3.0
 OPTIMAL_THRESHOLD = 0.5
 
 # Resume training configuration
-RESUME_TRAINING = True  # Set to False to start fresh
+RESUME_TRAINING = True # Set to False to start fresh
 
 # --- 2. Data Loading and Preprocessing ---
 
 print("Loading and preprocessing data using memory-mapping...")
 
 try:
+    #real_data_mmap = np.load(REAL_DATA_PATH)
+    #fake_data_mmap = np.load(FAKE_DATA_PATH)
     real_data_mmap = np.load(REAL_DATA_PATH, mmap_mode='r')
     fake_data_mmap = np.load(FAKE_DATA_PATH, mmap_mode='r')
 except FileNotFoundError as e:
@@ -60,7 +62,7 @@ class LFunctionDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        feature = self.data[idx]
+        feature = np.array(self.data[idx])
         feature_tensor = torch.FloatTensor(feature).permute(2, 0, 1)
         # Create the label
         label_tensor = torch.FloatTensor([self.label]).unsqueeze(0)
@@ -84,7 +86,7 @@ train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], 
 # Create DataLoaders
 # The DataLoader will handle shuffling the combined dataset
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE*10, shuffle=False, num_workers=8, pin_memory=True, persistent_workers=True)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE*2, shuffle=False, num_workers=8, pin_memory=True, persistent_workers=True)
 
 print(f"Created {len(train_dataset)} training samples and {len(val_dataset)} validation samples.")
 print("Data is being loaded from disk in batches, not all at once.")
@@ -94,31 +96,31 @@ print("Data is being loaded from disk in batches, not all at once.")
 class LFunctionCNN(nn.Module):
     def __init__(self):
         super(LFunctionCNN, self).__init__()
-        # Input: (Batch, 2, 100, 100)
+        # Input: (Batch, 2, 200, 200)
         self.conv_layers = nn.Sequential(
             # Block 1
             nn.Conv2d(in_channels=2, out_channels=64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (16, 50, 50)
+            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (64, 100, 100)
 
             # Block 2
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (32, 25, 25)
+            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (128, 50, 50)
 
             # Block 3
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (64, 12, 12)
+            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (256, 25, 25)
 
             # Block 4
             nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (128, 6, 6)
+            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (512, 12, 12)
 
             nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512),
@@ -127,8 +129,10 @@ class LFunctionCNN(nn.Module):
         )
 
         self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(512 * 6 * 6, 256),
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, 1)
@@ -218,7 +222,7 @@ best_model_state = None
 
 if RESUME_TRAINING:
     try:
-        checkpoint = torch.load('L_function_classifier_checkpoint.pth', map_location=DEVICE)
+        checkpoint = torch.load(f'L_function_classifier_{IMAGE_SIZE}_checkpoint.pth', map_location=DEVICE)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         START_EPOCH = checkpoint['epoch']
@@ -256,11 +260,11 @@ for epoch in range(START_EPOCH, START_EPOCH + EPOCHS):
     # Collect all predictions and labels for metric calculation
     all_train_preds = []
     all_train_labels = []
-    
+   
     for features, labels in train_loader:
         labels = labels.squeeze(1)
         features, labels = features.to(DEVICE), labels.to(DEVICE)
-        
+
         optimizer.zero_grad()
         #with autocast('cuda'):  # Use mixed precision
         #    outputs = model(features)
@@ -275,12 +279,13 @@ for epoch in range(START_EPOCH, START_EPOCH + EPOCHS):
         optimizer.step()
         
         running_loss += loss.item()
-
+        #print("Actual compute time for 1 loop:", time.time() - compute_start_time)
         # Collect predictions for metric calculation
         with torch.no_grad():
             preds = torch.round(torch.sigmoid(outputs))
             all_train_preds.append(preds)
             all_train_labels.append(labels)
+
 
     # Concatenate all predictions and labels
     all_train_preds = torch.cat(all_train_preds)
@@ -339,8 +344,8 @@ checkpoint = {
     'optimizer_state_dict': optimizer.state_dict(),
     'best_val_f1_real': best_val_f1_real,
 }
-torch.save(checkpoint, 'L_function_classifier_checkpoint.pth')
-print("\nCheckpoint saved to L_function_classifier_checkpoint.pth")
+torch.save(checkpoint, f'L_function_classifier_{IMAGE_SIZE}_checkpoint.pth')
+print(f"\nCheckpoint saved to L_function_classifier_{IMAGE_SIZE}_checkpoint.pth")
 
 # --- Final Evaluation with Confusion Matrix ---
 print("\n" + "="*50)
