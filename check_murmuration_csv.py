@@ -25,9 +25,24 @@ def main():
     print(f"Reading data from {INPUT_CSV}...")
     
     # Dictionary to store stats per rank
-    # Key: rank (int), Value: {'sum': np.array, 'count': int, 'max_len': int}
-    rank_stats = {}
+    # Key: rank (int), Value: [ap_sums, count, max_len]
+    rank_data = {}
     
+    # Helper to update sums (Keep EXACTLY same logic as working version)
+    def update_sums(sums, max_l, current_l, arr):
+        if sums is None:
+            return arr, current_l
+        if current_l > max_l:
+            new_sums = np.zeros(current_l, dtype=np.float64)
+            new_sums[:max_l] = sums
+            sums = new_sums
+            max_l = current_l
+        elif current_l < max_l:
+            padded = np.zeros(max_l, dtype=np.float64)
+            padded[:current_l] = arr
+            arr = padded
+        return sums + arr, max_l
+
     try:
         with open(INPUT_CSV, 'r') as f:
             reader = csv.reader(f)
@@ -36,7 +51,6 @@ def main():
                 if not row:
                     continue
                     
-                # Skip header if present
                 if row[0].strip() and not row[0].lstrip('-').replace('.','',1).isdigit():
                     continue
 
@@ -57,7 +71,7 @@ def main():
                 else:
                     try:
                         aps_array = np.array([float(x) for x in row], dtype=np.float64)
-                        rank = -1 # Mark as unknown/fake
+                        rank = -1 # Mark as unknown
                     except ValueError:
                         continue
 
@@ -67,70 +81,44 @@ def main():
                 current_len = len(aps_array)
                 
                 # Initialize rank entry if not exists
-                if rank not in rank_stats:
-                    rank_stats[rank] = {
-                        'sum': np.zeros(current_len, dtype=np.float64),
-                        'count': 0,
-                        'max_len': current_len
-                    }
-
-                stats = rank_stats[rank]
+                if rank not in rank_data:
+                    rank_data[rank] = [None, 0, 0] # [sums, count, max_len]
                 
-                # Update sums with dynamic resizing
-                if current_len > stats['max_len']:
-                    # Expand sum array
-                    new_sums = np.zeros(current_len, dtype=np.float64)
-                    new_sums[:stats['max_len']] = stats['sum']
-                    stats['sum'] = new_sums
-                    stats['max_len'] = current_len
-                elif current_len < stats['max_len']:
-                    # Pad current array
-                    padded = np.zeros(stats['max_len'], dtype=np.float64)
-                    padded[:current_len] = aps_array
-                    aps_array = padded
-                
-                stats['sum'] += aps_array
-                stats['count'] += 1
+                stats = rank_data[rank]
+                stats[0], stats[2] = update_sums(stats[0], stats[2], current_len, aps_array)
+                stats[1] += 1
 
-        if not rank_stats:
+        total_count = sum(stats[1] for stats in rank_data.values())
+        if total_count == 0:
             print("No valid data found.")
             return
 
-        print(f"Found ranks: {sorted(rank_stats.keys())}")
-        for r in sorted(rank_stats.keys()):
-            print(f"  Rank {r}: {rank_stats[r]['count']} curves")
+        sorted_ranks = sorted(rank_data.keys())
+        print(f"Processed {total_count} curves. Ranks found: {sorted_ranks}")
+        for r in sorted_ranks:
+            print(f"  Rank {r}: {rank_data[r][1]} curves")
         
         plt.figure(figsize=(12, 6))
         
-        # Get a colormap to assign different colors to different ranks
-        # We use a qualitative colormap
-        sorted_ranks = sorted(rank_stats.keys())
-        cmap = plt.get_cmap('tab10') 
+        # Get a colormap for multiple ranks
+        cmap = plt.get_cmap('tab10')
         
-        max_plot_len = 0
-        
-        for i, r in enumerate(sorted_ranks):
-            stats = rank_stats[r]
-            count = stats['count']
-            if count == 0:
-                continue
+        for i, rank in enumerate(sorted_ranks):
+            sums, count, max_l = rank_data[rank]
+            if count > 0:
+                ap_avg = sums / count
+                primes = np.array([sympy.prime(k) for k in range(1, len(ap_avg) + 1)])
                 
-            ap_avg = stats['sum'] / count
-            primes = np.array([sympy.prime(k) for k in range(1, len(ap_avg) + 1)])
-            
-            # Labeling
-            if r == -1:
-                label = f'Unknown/Fake (N={count})'
-                color = 'gray'
-                alpha = 0.3
-            else:
-                label = f'Rank {r} (N={count})'
-                # Cycle through colors if more than 10 ranks
-                color = cmap(i % 10)
-                alpha = 0.6
-
-            plt.plot(primes, ap_avg, '.', markersize=3, alpha=alpha, color=color, label=label)
-            max_plot_len = max(max_plot_len, len(ap_avg))
+                if rank == -1:
+                    label = f'Unknown/Fake (N={count})'
+                    color = 'gray'
+                    alpha = 0.3
+                else:
+                    label = f'Rank {rank} (N={count})'
+                    color = cmap(i % 10)
+                    alpha = 0.5
+                
+                plt.plot(primes, ap_avg, '.', markersize=2, alpha=alpha, color=color, label=label)
 
         plt.axhline(y=0, color='r', linestyle='--', alpha=0.5)
         plt.xlabel('Prime p')
