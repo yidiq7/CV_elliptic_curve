@@ -7,7 +7,6 @@ import csv
 import ast
 import sympy
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import os
 import sys
 import argparse
@@ -40,7 +39,7 @@ def load_real_data(filepath, max_len):
 
     with open(filepath, 'r') as f:
         reader = csv.reader(f)
-        for row in tqdm(reader, desc="Parsing Real Data"):
+        for row in reader:
             if not row or (row[0].strip() and not row[0].lstrip('-').replace('.', '', 1).isdigit()):
                 continue
             
@@ -78,7 +77,7 @@ def load_fake_data(filepath, max_len):
     try:
         with open(filepath, 'r') as f:
             reader = csv.reader(f)
-            for row in tqdm(reader, desc="Parsing Fake Data"):
+            for row in reader:
                 if not row: continue
                 
                 try:
