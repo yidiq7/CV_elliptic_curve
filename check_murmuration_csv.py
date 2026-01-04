@@ -104,19 +104,17 @@ def main():
         cmap = plt.get_cmap('tab10')
         
         for i, rank in enumerate(sorted_ranks):
+            if rank not in [0, 1, 2]:
+                continue
+                
             sums, count, max_l = rank_data[rank]
             if count > 0:
                 ap_avg = sums / count
                 primes = np.array([sympy.prime(k) for k in range(1, len(ap_avg) + 1)])
                 
-                if rank == -1:
-                    label = f'Unknown/Fake (N={count})'
-                    color = 'gray'
-                    alpha = 0.3
-                else:
-                    label = f'Rank {rank} (N={count})'
-                    color = cmap(i % 10)
-                    alpha = 0.5
+                label = f'Rank {rank} (N={count})'
+                color = cmap(i % 10)
+                alpha = 0.5
                 
                 plt.plot(primes, ap_avg, '.', markersize=2, alpha=alpha, color=color, label=label)
 
