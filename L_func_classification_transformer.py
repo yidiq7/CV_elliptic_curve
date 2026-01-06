@@ -26,6 +26,7 @@ parser.add_argument('--batch_size', type=int, default=1024, help='Batch size (hi
 parser.add_argument('--lr', type=float, default=1e-3, help='Peak learning rate')
 parser.add_argument('--weight_decay', type=float, default=0.05, help='Weight decay (AdamW)')
 parser.add_argument('--warmup_epochs', type=int, default=5, help='Linear warmup epochs')
+parser.add_argument('--use_conv_stem', action='store_true', help='Use a Convolutional Stem (Hybrid architecture)')
 
 args = parser.parse_args()
 
@@ -92,16 +93,35 @@ print(f"Batch Size: {args.batch_size} | Steps per epoch: {len(train_loader)}")
 
 class LFunctionTransformer(nn.Module):
     def __init__(self, image_size=IMAGE_SIZE, patch_size=args.patch_size, dim=args.dim, 
-                 depth=args.depth, heads=args.heads, mlp_dim=args.mlp_dim, channels=2, dropout=args.dropout):
+                 depth=args.depth, heads=args.heads, mlp_dim=args.mlp_dim, channels=2, dropout=args.dropout, 
+                 use_conv_stem=False):
         super().__init__()
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
         
         num_patches = (image_size // patch_size) ** 2
         
-        self.to_patch_embedding = nn.Sequential(
-            nn.Conv2d(channels, dim, kernel_size=patch_size, stride=patch_size),
-            nn.Flatten(2), # (B, dim, num_patches)
-        )
+        if use_conv_stem:
+            # Hybrid Architecture: Small CNN stem before tokenization
+            # This extracts local features (3x3 convs) before projecting to tokens
+            self.to_patch_embedding = nn.Sequential(
+                # Layer 1: Extract low-level features
+                nn.Conv2d(channels, 64, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(64),
+                nn.ReLU(),
+                # Layer 2: Refine features
+                nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(64),
+                nn.ReLU(),
+                # Layer 3: Project to embeddings (using stride=patch_size to maintain sequence length)
+                nn.Conv2d(64, dim, kernel_size=patch_size, stride=patch_size),
+                nn.Flatten(2), # (B, dim, num_patches)
+            )
+        else:
+            # Standard ViT: Linear projection of flattened patches
+            self.to_patch_embedding = nn.Sequential(
+                nn.Conv2d(channels, dim, kernel_size=patch_size, stride=patch_size),
+                nn.Flatten(2), # (B, dim, num_patches)
+            )
 
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim) * 0.02)
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim) * 0.02)
@@ -152,8 +172,9 @@ class LFunctionCNN(nn.Module):
         return self.classifier(self.conv_layers(x))
 
 if args.model == 'transformer':
-    print(f"\nInitializing Transformer (Patch: {args.patch_size}, Dim: {args.dim}, Depth: {args.depth}, Heads: {args.heads})")
-    model = LFunctionTransformer().to(DEVICE)
+    stem_type = "Convolutional" if args.use_conv_stem else "Standard Linear"
+    print(f"\nInitializing Transformer ({stem_type} Stem, Patch: {args.patch_size}, Dim: {args.dim}, Depth: {args.depth}, Heads: {args.heads})")
+    model = LFunctionTransformer(use_conv_stem=args.use_conv_stem).to(DEVICE)
 else:
     print("\nInitializing CNN")
     model = LFunctionCNN().to(DEVICE)
