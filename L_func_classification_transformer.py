@@ -195,11 +195,22 @@ if args.resume:
     if os.path.isfile(args.resume):
         print(f"\nLoading checkpoint from '{args.resume}'...")
         checkpoint = torch.load(args.resume, map_location=DEVICE)
-        START_EPOCH = checkpoint['epoch']
-        best_val_f1 = checkpoint.get('best_val_f1_real', 0.0)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        print(f"Resuming from epoch {START_EPOCH} (Best F1: {best_val_f1:.4f})")
+        
+        # Check if it's a full checkpoint or just model weights
+        if 'epoch' in checkpoint:
+            START_EPOCH = checkpoint['epoch']
+            best_val_f1 = checkpoint.get('best_val_f1_real', 0.0)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            print(f"Resuming from epoch {START_EPOCH} (Best F1: {best_val_f1:.4f})")
+        else:
+            # Assume it's just the model state dict
+            print("Checkpoint appears to be model weights only (no epoch/optimizer state).")
+            print("Loading weights and starting fine-tuning/training from Epoch 0.")
+            model.load_state_dict(checkpoint)
+            START_EPOCH = 0
+            best_val_f1 = 0.0 # Reset best f1 tracking
+            
     else:
         print(f"\nCheckpoint '{args.resume}' not found. Starting from scratch.")
 
@@ -299,11 +310,25 @@ for epoch in range(args.epochs):
     
     epoch_time = time.time() - epoch_start
     
-    print(f"{epoch+1:^7} | {avg_loss:^8.4f} | {current_lr:^9.2e} | {train_metrics['f1_real']:^10.4f} | {val_metrics['f1_real']:^10.4f} | {val_metrics['acc']:^10.4f} | {epoch_time:^8.1f}")
+    # Save regular checkpoint
+    save_path = f'L_function_{args.model}_{IMAGE_SIZE}_checkpoint.pth'
+    checkpoint = {
+        'epoch': epoch + 1, # Save next epoch to start from
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'best_val_f1_real': best_val_f1,
+        'args': vars(args)
+    }
+    torch.save(checkpoint, save_path)
+    print(f"\nCheckpoint saved to {save_path}")
 
+    # Save best model (full checkpoint now)
     if val_metrics['f1_real'] > best_val_f1:
         best_val_f1 = val_metrics['f1_real']
-        torch.save(model.state_dict(), f'best_transformer_{IMAGE_SIZE}.pth')
+        # Update best val f1 in checkpoint dict before saving
+        checkpoint['best_val_f1_real'] = best_val_f1
+        torch.save(checkpoint, f'best_transformer_{IMAGE_SIZE}.pth')
+        print(f"  -> New best model saved (F1: {best_val_f1:.4f})")
 
 print(f"\nTraining finished in {(time.time() - start_time)/60:.1f} minutes.")
 print(f"Best Val F1 (Real): {best_val_f1:.4f}")
