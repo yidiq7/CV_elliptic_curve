@@ -27,6 +27,7 @@ parser.add_argument('--lr', type=float, default=1e-3, help='Peak learning rate')
 parser.add_argument('--weight_decay', type=float, default=0.05, help='Weight decay (AdamW)')
 parser.add_argument('--warmup_epochs', type=int, default=5, help='Linear warmup epochs')
 parser.add_argument('--use_conv_stem', action='store_true', help='Use a Convolutional Stem (Hybrid architecture)')
+parser.add_argument('--resume', type=str, default=None, help='Path to checkpoint to resume training from')
 
 args = parser.parse_args()
 
@@ -186,8 +187,24 @@ criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 scaler = GradScaler('cuda')
 
+# Checkpoint Loading logic
+START_EPOCH = 0
+best_val_f1 = 0.0
+
+if args.resume:
+    if os.path.isfile(args.resume):
+        print(f"\nLoading checkpoint from '{args.resume}'...")
+        checkpoint = torch.load(args.resume, map_location=DEVICE)
+        START_EPOCH = checkpoint['epoch']
+        best_val_f1 = checkpoint.get('best_val_f1_real', 0.0)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        print(f"Resuming from epoch {START_EPOCH} (Best F1: {best_val_f1:.4f})")
+    else:
+        print(f"\nCheckpoint '{args.resume}' not found. Starting from scratch.")
+
 # Learning Rate Scheduler (Linear Warmup + Cosine Decay)
-def get_scheduler(optimizer, warmup_epochs, max_epochs, steps_per_epoch):
+def get_scheduler(optimizer, warmup_epochs, max_epochs, steps_per_epoch, last_epoch=-1):
     total_steps = max_epochs * steps_per_epoch
     warmup_steps = warmup_epochs * steps_per_epoch
     
@@ -197,9 +214,12 @@ def get_scheduler(optimizer, warmup_epochs, max_epochs, steps_per_epoch):
         progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
         return 0.5 * (1.0 + math.cos(math.pi * progress))
 
-    return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    # Calculate last_epoch for the scheduler based on the resumed epoch
+    scheduler_last_epoch = (last_epoch * steps_per_epoch) - 1 if last_epoch > 0 else -1
+    
+    return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch=scheduler_last_epoch)
 
-scheduler = get_scheduler(optimizer, args.warmup_epochs, args.epochs, len(train_loader))
+scheduler = get_scheduler(optimizer, args.warmup_epochs, args.epochs, len(train_loader), last_epoch=START_EPOCH)
 
 # --- 5. Helper Metrics ---
 def calculate_metrics(predictions, labels):
