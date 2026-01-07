@@ -310,6 +310,8 @@ for epoch in range(args.epochs):
     
     epoch_time = time.time() - epoch_start
     
+    print(f"{epoch+1:^7} | {avg_loss:^8.4f} | {current_lr:^9.2e} | {train_metrics['f1_real']:^10.4f} | {val_metrics['f1_real']:^10.4f} | {val_metrics['acc']:^10.4f} | {epoch_time:^8.1f}")
+    
     # Save regular checkpoint
     save_path = f'L_function_{args.model}_{IMAGE_SIZE}_checkpoint.pth'
     checkpoint = {
