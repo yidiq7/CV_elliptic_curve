@@ -312,19 +312,17 @@ for epoch in range(args.epochs):
     
     print(f"{epoch+1:^7} | {avg_loss:^8.4f} | {current_lr:^9.2e} | {train_metrics['f1_real']:^10.4f} | {val_metrics['f1_real']:^10.4f} | {val_metrics['acc']:^10.4f} | {epoch_time:^8.1f}")
     
-    # Save regular checkpoint
-    save_path = f'L_function_{args.model}_{IMAGE_SIZE}_checkpoint.pth'
+    
+    # Checkpoint logic
     checkpoint = {
-        'epoch': epoch + 1, # Save next epoch to start from
+        'epoch': epoch + 1,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'best_val_f1_real': best_val_f1,
         'args': vars(args)
     }
-    torch.save(checkpoint, save_path)
-    print(f"\nCheckpoint saved to {save_path}")
 
-    # Save best model (full checkpoint now)
+    # Save ONLY if best model (full checkpoint)
     if val_metrics['f1_real'] > best_val_f1:
         best_val_f1 = val_metrics['f1_real']
         # Update best val f1 in checkpoint dict before saving
