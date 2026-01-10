@@ -257,7 +257,7 @@ print("-" * 100)
 best_val_f1 = 0.0
 start_time = time.time()
 
-for epoch in range(args.epochs):
+for epoch in range(START_EPOCH, START_EPOCH + args.epochs):
     epoch_start = time.time()
     model.train()
     running_loss = 0.0
