@@ -9,7 +9,7 @@ import csv
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
-SIZE = 200
+SIZE = 100
 GENERATE_REAL = True 
 GENERATE_FAKE = True
 
