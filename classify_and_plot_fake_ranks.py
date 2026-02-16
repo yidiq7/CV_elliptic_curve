@@ -305,7 +305,7 @@ def main():
     plt.axhline(y=0, color='r', linestyle='--', alpha=0.5)
     plt.xlabel('Prime p')
     plt.ylabel('Average a_p')
-    plt.title(f'Murmuration of Fake Elliptic Curves (by Predicted Rank)\nModel trained on normalized $a_p / \sqrt{{p}}$')
+    plt.title(f'Murmuration of Fake Elliptic Curves (by Predicted Rank)')
     plt.legend()
     plt.grid(True, alpha=0.3)
     
