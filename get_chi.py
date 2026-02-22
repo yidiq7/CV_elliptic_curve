@@ -16,8 +16,9 @@ for N in range(1, N_max + 1):
     
     # Iterate through each character in the group
     for chi in G:
-        # .list() returns the values [chi(0), chi(1), ..., chi(N-1)]
-        all_characters.append(chi.list())
+        if chi.is_primitive():
+            # .list() returns the values [chi(0), chi(1), ..., chi(N-1)]
+                all_characters.append(chi.list())
 
 print(f"Total number of characters generated: {len(all_characters)}")
 
