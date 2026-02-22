@@ -15,7 +15,7 @@ GENERATE_FAKE = True
 
 primes = np.array([sympy.prime(i) for i in range(1, SIZE+1)])  # primes[0] = 2, primes[99] = 541
 
-with open("chifull.txt", "r") as f:
+with open("chiprimitive.txt", "r") as f:
     chifull_str = f.read().strip()
 
 chifull_str = chifull_str.replace("^", "**")
@@ -70,8 +70,8 @@ def replace_and_evaluate(expr):
 allchi = replace_and_evaluate(chifull)
 
 padchi = np.array([
-    [allchi[k][m % len(allchi[k])] for m in range(SIZE)]
-    for k in range(SIZE)  
+    [allchi[j][primes[i] % len(allchi[j])] for j in range(SIZE)]
+    for i in range(SIZE)  
 ])
 
 re_padchi = padchi.real
