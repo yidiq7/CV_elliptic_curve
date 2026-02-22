@@ -14,11 +14,11 @@ print(f"Using device: {DEVICE}")
 # Hyperparameters
 LEARNING_RATE = 0.001
 BATCH_SIZE = 256
-EPOCHS = 10
+EPOCHS = 100
 TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
 
 # File paths for your data
-IMAGE_SIZE = 500
+IMAGE_SIZE = 100
 REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
 FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
 

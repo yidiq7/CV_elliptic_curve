@@ -18,7 +18,7 @@ EPOCHS = 100
 TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
 
 # File paths for your data
-IMAGE_SIZE = 200
+IMAGE_SIZE = 500
 REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
 FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
 
@@ -292,7 +292,8 @@ for epoch in range(START_EPOCH, START_EPOCH + EPOCHS):
         #print("Actual compute time for 1 loop:", time.time() - compute_start_time)
         # Collect predictions for metric calculation
         with torch.no_grad():
-            preds = torch.round(torch.sigmoid(outputs))
+            preds = (torch.sigmoid(outputs) > 0.2).float()
+            #preds = torch.round(torch.sigmoid(outputs))
             all_train_preds.append(preds)
             all_train_labels.append(labels)
 
@@ -314,7 +315,8 @@ for epoch in range(START_EPOCH, START_EPOCH + EPOCHS):
             labels = labels.squeeze(1)
             features, labels = features.to(DEVICE), labels.to(DEVICE)
             outputs = model(features)
-            preds = torch.round(torch.sigmoid(outputs))
+            preds = (torch.sigmoid(outputs) > 0.2).float()
+            #preds = torch.round(torch.sigmoid(outputs))
             all_val_preds.append(preds)
             all_val_labels.append(labels)
     

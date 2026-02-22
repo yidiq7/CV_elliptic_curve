@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description='L-function Classification with CNN
 parser.add_argument('--model', type=str, default='transformer', choices=['cnn', 'transformer'], help='Model architecture')
 parser.add_argument('--image_size', type=int, default=300, help='Input image size')
 # Transformer Hyperparameters (Tuned for H200)
-parser.add_argument('--patch_size', type=int, default=15, help='Patch size (15 for 300x300 -> 20x20 grid)')
+parser.add_argument('--patch_size', type=int, default=20, help='Patch size (20 for 300x300 -> 15x15 grid)')
 parser.add_argument('--dim', type=int, default=512, help='Embedding dimension')
 parser.add_argument('--depth', type=int, default=8, help='Transformer depth')
 parser.add_argument('--heads', type=int, default=8, help='Attention heads')
