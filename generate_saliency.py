@@ -191,13 +191,11 @@ def main():
     def plot_enhanced_heatmap(map_data, title, filename_suffix, cmap='hot'):
         # We want to show standard deviation across columns (twists) for each row (prime)
         std_across_twists = map_data.std(axis=1)
-        # Use max instead of mean to preserve the sparse mathematical signal
-        max_across_twists = map_data.max(axis=1)
+        mean_across_twists = map_data.mean(axis=1)
         
         # We want to show standard deviation across rows (primes) for each column (twist)
         std_across_primes = map_data.std(axis=0)
-        # Use max instead of mean to preserve the sparse mathematical signal
-        max_across_primes = map_data.max(axis=0)
+        mean_across_primes = map_data.mean(axis=0)
 
         fig, ax = plt.subplots(figsize=(10, 8))
         
@@ -215,25 +213,25 @@ def main():
         
         # Marginal plot for Primes (Right side) - Projection onto Primes
         ax_prime = divider.append_axes("right", size="20%", pad=0.1)
-        ax_prime.plot(max_across_twists, range(IMAGE_SIZE), color='red', label='Max Saliency')
+        ax_prime.plot(mean_across_twists, range(IMAGE_SIZE), color='red', label='Mean Saliency')
         ax_prime.fill_betweenx(range(IMAGE_SIZE), 
-                               max_across_twists - std_across_twists, 
-                               max_across_twists + std_across_twists, 
-                               color='red', alpha=0.2)
+                               mean_across_twists - std_across_twists, 
+                               mean_across_twists + std_across_twists, 
+                               color='red', alpha=0.2, label='Std Dev')
         ax_prime.invert_yaxis()  # Match image coordinates
-        ax_prime.set_xlabel('Max Abs Grad', fontsize=10)
+        ax_prime.set_xlabel('Abs Grad', fontsize=10)
         ax_prime.set_yticks([])
         ax_prime.grid(True, alpha=0.3)
         ax_prime.legend(loc='upper right', fontsize=8)
         
         # Marginal plot for Twists (Top side) - Projection onto Twists
         ax_twist = divider.append_axes("top", size="20%", pad=0.1)
-        ax_twist.plot(range(IMAGE_SIZE), max_across_primes, color='blue', label='Max Saliency')
+        ax_twist.plot(range(IMAGE_SIZE), mean_across_primes, color='blue', label='Mean Saliency')
         ax_twist.fill_between(range(IMAGE_SIZE), 
-                              max_across_primes - std_across_primes, 
-                              max_across_primes + std_across_primes, 
-                              color='blue', alpha=0.2)
-        ax_twist.set_ylabel('Max Abs Grad', fontsize=10)
+                              mean_across_primes - std_across_primes, 
+                              mean_across_primes + std_across_primes, 
+                              color='blue', alpha=0.2, label='Std Dev')
+        ax_twist.set_ylabel('Abs Grad', fontsize=10)
         ax_twist.set_xticks([])
         ax_twist.grid(True, alpha=0.3)
         ax_twist.legend(loc='upper right', fontsize=8)
