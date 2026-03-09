@@ -1,10 +1,12 @@
+import os
+import csv
+import random
 import torch
 import torch.nn as nn
 import numpy as np
-import os
 import matplotlib.pyplot as plt
-import csv
 from torch.utils.data import DataLoader, Dataset
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # --- 1. Model Architecture (Must match L_func_classification.py) ---
 class LFunctionCNN(nn.Module):
@@ -52,10 +54,12 @@ class SaliencyDataset(Dataset):
     def __init__(self, data_path, indices=None, num_samples=None):
         self.data = np.load(data_path, mmap_mode='r')
         if indices is None:
-            max_len = len(self.data)
-            self.indices = list(range(num_samples if num_samples is not None else max_len))
+            self.indices = list(range(len(self.data)))
         else:
-            self.indices = indices[:num_samples] if num_samples is not None else indices
+            self.indices = indices
+            
+        if num_samples is not None:
+            self.indices = self.indices[:num_samples]
 
     def __len__(self):
         return len(self.indices)
@@ -80,6 +84,7 @@ def compute_average_saliency(model, loader, device, num_samples=None):
         model.zero_grad()
         score.backward()
         
+        # Saliency is the absolute value of the gradient
         saliency = batch.grad.data.abs()
         batch_avg = saliency.sum(dim=0)
         
@@ -94,8 +99,6 @@ def compute_average_saliency(model, loader, device, num_samples=None):
             
     return (avg_saliency / samples_processed).cpu().numpy()
 
-import random
-
 def get_rank_indices(csv_path):
     rank0_indices = []
     rank1_indices = []
@@ -105,7 +108,7 @@ def get_rank_indices(csv_path):
         
     with open(csv_path, 'r') as f:
         reader = csv.reader(f)
-        header = next(reader)
+        next(reader) # Skip header
         for i, row in enumerate(reader):
             try:
                 rank = int(row[1])
@@ -149,10 +152,10 @@ def main():
         print("Falling back to unseparated real data.")
         real_ds = SaliencyDataset(REAL_DATA_PATH, num_samples=NUM_SAMPLES)
         real_loader = DataLoader(real_ds, batch_size=256, shuffle=False)
-        rank0_saliency = compute_average_saliency(model, real_loader, DEVICE, NUM_SAMPLES)
-        rank1_saliency = rank0_saliency # Just duplicate if we can't separate
+        real_saliency = compute_average_saliency(model, real_loader, DEVICE, NUM_SAMPLES)
     else:
         print(f"Found {len(rank0_indices)} Rank 0 curves and {len(rank1_indices)} Rank 1 curves.")
+        
         # Rank 0 Saliency
         r0_ds = SaliencyDataset(REAL_DATA_PATH, indices=rank0_indices, num_samples=NUM_SAMPLES)
         r0_loader = DataLoader(r0_ds, batch_size=256, shuffle=False)
@@ -178,17 +181,16 @@ def main():
     fake_saliency = compute_average_saliency(model, fake_loader, DEVICE, NUM_SAMPLES)
     
     # Create output directory
-    output_dir = 'saliency_maps'
+    output_dir = f'saliency_maps_{IMAGE_SIZE}'
     os.makedirs(output_dir, exist_ok=True)
 
     # Save raw data
-    np.save(os.path.join(output_dir, 'real_saliency_avg.npy'), real_saliency if rank0_indices is None else all_real_saliency)
+    np.save(os.path.join(output_dir, 'real_saliency_avg.npy'), real_saliency)
     np.save(os.path.join(output_dir, 'fake_saliency_avg.npy'), fake_saliency)
     
     if rank0_indices is not None:
         np.save(os.path.join(output_dir, 'rank0_saliency_avg.npy'), rank0_saliency)
         np.save(os.path.join(output_dir, 'rank1_saliency_avg.npy'), rank1_saliency)
-        np.save(os.path.join(output_dir, 'real_saliency_avg.npy'), real_saliency)
     
     # Average across channels (Real/Imag parts)
     real_map = real_saliency.mean(axis=0)
@@ -198,8 +200,6 @@ def main():
     if rank0_indices is not None:
         r0_map = rank0_saliency.mean(axis=0)
         r1_map = rank1_saliency.mean(axis=0)
-    
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     def plot_enhanced_heatmap(map_data, title, filename_suffix, cmap='hot'):
         # We want to show standard deviation across columns (twists) for each row (prime)
