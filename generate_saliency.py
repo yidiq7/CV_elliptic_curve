@@ -184,53 +184,70 @@ def main():
     r0_map = rank0_saliency.mean(axis=0)
     r1_map = rank1_saliency.mean(axis=0)
     fake_map = fake_saliency.mean(axis=0)
-    
-    # Plotting 2D Heatmaps
-    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
-    
-    im0 = axes[0, 0].imshow(r0_map, cmap='hot')
-    axes[0, 0].set_title('Average Rank 0 Saliency')
-    plt.colorbar(im0, ax=axes[0, 0])
-    
-    im1 = axes[0, 1].imshow(r1_map, cmap='hot')
-    axes[0, 1].set_title('Average Rank 1 Saliency')
-    plt.colorbar(im1, ax=axes[0, 1])
-    
-    im2 = axes[1, 0].imshow(fake_map, cmap='hot')
-    axes[1, 0].set_title('Average Fake Saliency')
-    plt.colorbar(im2, ax=axes[1, 0])
-    
     diff_map = r0_map - fake_map
-    im3 = axes[1, 1].imshow(diff_map, cmap='coolwarm')
-    axes[1, 1].set_title('Rank 0 - Fake Saliency')
-    plt.colorbar(im3, ax=axes[1, 1])
     
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'saliency_maps_2d.png'), dpi=300)
-    print(f"2D Saliency maps saved to {output_dir}/saliency_maps_2d.png")
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-    # 1D Projections
-    # 1. Primes (average over twists/characters -> axis=1)
-    plt.figure(figsize=(10, 6))
-    plt.plot(r0_map.mean(axis=1), label='Rank 0 (Average over twists)')
-    plt.plot(r1_map.mean(axis=1), label='Rank 1 (Average over twists)')
-    plt.plot(fake_map.mean(axis=1), label='Fake (Average over twists)', linestyle='--')
-    plt.title('Saliency Projection onto Prime Index')
-    plt.xlabel('Prime index (p)')
-    plt.ylabel('Saliency')
-    plt.legend()
-    plt.savefig(os.path.join(output_dir, 'saliency_1d_primes.png'))
-    
-    # 2. Twists (average over primes -> axis=0)
-    plt.figure(figsize=(10, 6))
-    plt.plot(r0_map.mean(axis=0), label='Rank 0 (Average over primes)')
-    plt.plot(r1_map.mean(axis=0), label='Rank 1 (Average over primes)')
-    plt.plot(fake_map.mean(axis=0), label='Fake (Average over primes)', linestyle='--')
-    plt.title('Saliency Projection onto Twist Index')
-    plt.xlabel('Dirichlet character index')
-    plt.ylabel('Saliency')
-    plt.legend()
-    plt.savefig(os.path.join(output_dir, 'saliency_1d_twists.png'))
+    def plot_enhanced_heatmap(map_data, title, filename_suffix, cmap='hot'):
+        # We want to show standard deviation across columns (twists) for each row (prime)
+        std_across_twists = map_data.std(axis=1)
+        # Use max instead of mean to preserve the sparse mathematical signal
+        max_across_twists = map_data.max(axis=1)
+        
+        # We want to show standard deviation across rows (primes) for each column (twist)
+        std_across_primes = map_data.std(axis=0)
+        # Use max instead of mean to preserve the sparse mathematical signal
+        max_across_primes = map_data.max(axis=0)
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Clip to a high percentile to prevent a single pixel from washing out the colormap
+        vmax = np.percentile(np.abs(map_data), 99.5)
+        vmin = -vmax if cmap == 'coolwarm' else 0
+        
+        im = ax.imshow(map_data, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax)
+        ax.set_title(f'{title} (N={IMAGE_SIZE})', fontsize=14)
+        ax.set_ylabel('Primes ($p$)', fontsize=12)
+        ax.set_xlabel('Twists ($\chi$)', fontsize=12)
+
+        # Create dividers for marginal plots
+        divider = make_axes_locatable(ax)
+        
+        # Marginal plot for Primes (Right side) - Projection onto Primes
+        ax_prime = divider.append_axes("right", size="20%", pad=0.1)
+        ax_prime.plot(max_across_twists, range(IMAGE_SIZE), color='red', label='Max Saliency')
+        ax_prime.fill_betweenx(range(IMAGE_SIZE), 
+                               max_across_twists - std_across_twists, 
+                               max_across_twists + std_across_twists, 
+                               color='red', alpha=0.2)
+        ax_prime.invert_yaxis()  # Match image coordinates
+        ax_prime.set_xlabel('Max Abs Grad', fontsize=10)
+        ax_prime.set_yticks([])
+        ax_prime.grid(True, alpha=0.3)
+        ax_prime.legend(loc='upper right', fontsize=8)
+        
+        # Marginal plot for Twists (Top side) - Projection onto Twists
+        ax_twist = divider.append_axes("top", size="20%", pad=0.1)
+        ax_twist.plot(range(IMAGE_SIZE), max_across_primes, color='blue', label='Max Saliency')
+        ax_twist.fill_between(range(IMAGE_SIZE), 
+                              max_across_primes - std_across_primes, 
+                              max_across_primes + std_across_primes, 
+                              color='blue', alpha=0.2)
+        ax_twist.set_ylabel('Max Abs Grad', fontsize=10)
+        ax_twist.set_xticks([])
+        ax_twist.grid(True, alpha=0.3)
+        ax_twist.legend(loc='upper right', fontsize=8)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300)
+        plt.close()
+
+    print("Generating enhanced marginal heatmaps...")
+    plot_enhanced_heatmap(r0_map, 'Rank 0 Saliency', 'rank0', 'hot')
+    plot_enhanced_heatmap(r1_map, 'Rank 1 Saliency', 'rank1', 'hot')
+    plot_enhanced_heatmap(fake_map, 'Fake Saliency', 'fake', 'hot')
+    plot_enhanced_heatmap(diff_map, 'Rank 0 - Fake Difference', 'diff', 'coolwarm')
+    print(f"All plots saved to {output_dir}/")
 
 if __name__ == "__main__":
     main()
