@@ -164,6 +164,12 @@ def main():
         r1_loader = DataLoader(r1_ds, batch_size=256, shuffle=False)
         print(f"Computing Rank 1 saliency ({len(r1_ds)} samples)...")
         rank1_saliency = compute_average_saliency(model, r1_loader, DEVICE, NUM_SAMPLES)
+
+        # All Real Saliency
+        all_real_ds = SaliencyDataset(REAL_DATA_PATH, num_samples=NUM_SAMPLES)
+        all_real_loader = DataLoader(all_real_ds, batch_size=256, shuffle=False)
+        print(f"Computing All Real saliency ({len(all_real_ds)} samples)...")
+        all_real_saliency = compute_average_saliency(model, all_real_loader, DEVICE, NUM_SAMPLES)
     
     # Fake Saliency
     fake_ds = SaliencyDataset(FAKE_DATA_PATH, num_samples=NUM_SAMPLES)
@@ -178,6 +184,8 @@ def main():
     # Save raw data
     np.save(os.path.join(output_dir, 'rank0_saliency_avg.npy'), rank0_saliency)
     np.save(os.path.join(output_dir, 'rank1_saliency_avg.npy'), rank1_saliency)
+    if rank0_indices is not None:
+        np.save(os.path.join(output_dir, 'all_real_saliency_avg.npy'), all_real_saliency)
     np.save(os.path.join(output_dir, 'fake_saliency_avg.npy'), fake_saliency)
     
     # Average across channels (Real/Imag parts)
@@ -185,6 +193,9 @@ def main():
     r1_map = rank1_saliency.mean(axis=0)
     fake_map = fake_saliency.mean(axis=0)
     diff_map = r0_map - fake_map
+    if rank0_indices is not None:
+        all_real_map = all_real_saliency.mean(axis=0)
+        all_diff_map = all_real_map - fake_map
     
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -245,6 +256,11 @@ def main():
     plot_enhanced_heatmap(r1_map, 'Rank 1 Saliency', 'rank1', 'hot')
     plot_enhanced_heatmap(fake_map, 'Fake Saliency', 'fake', 'hot')
     plot_enhanced_heatmap(diff_map, 'Rank 0 - Fake Difference', 'diff', 'coolwarm')
+    
+    if rank0_indices is not None:
+        plot_enhanced_heatmap(all_real_map, 'All Real Saliency', 'all_real', 'hot')
+        plot_enhanced_heatmap(all_diff_map, 'All Real - Fake Difference', 'all_diff', 'coolwarm')
+        
     print(f"All plots saved to {output_dir}/")
 
 if __name__ == "__main__":
