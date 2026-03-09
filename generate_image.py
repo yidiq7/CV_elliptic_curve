@@ -6,10 +6,12 @@ from PIL import Image
 import os
 import re
 import csv
+import sys
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
-SIZE = 100
+#SIZE = 100
+SIZE = int(sys.argv[1])
 GENERATE_REAL = True 
 GENERATE_FAKE = True
 
@@ -122,7 +124,7 @@ if GENERATE_REAL:
         # img_array_clipped = np.clip(img_array, 0, 1)
         # img_array_uint8 = (img_array_clipped * 255).astype(np.uint8)
         # img = Image.fromarray(img_array_uint8, 'RGB')
-        # img.save(f"./coloured/ECcoloured{i+1}.png")
+        # img.save(f"./coloured/ECcoloured{i+1}_{SIZE}.png")
 
     # Flush to disk
     del combined_array
