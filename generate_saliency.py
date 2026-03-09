@@ -125,9 +125,13 @@ def main():
     print("Computing Fake saliency...")
     fake_saliency = compute_average_saliency(model, fake_loader, DEVICE, 1000)
     
+    # Create output directory
+    output_dir = 'saliency_maps'
+    os.makedirs(output_dir, exist_ok=True)
+
     # Save raw data
-    np.save('real_saliency_avg.npy', real_saliency)
-    np.save('fake_saliency_avg.npy', fake_saliency)
+    np.save(os.path.join(output_dir, 'real_saliency_avg.npy'), real_saliency)
+    np.save(os.path.join(output_dir, 'fake_saliency_avg.npy'), fake_saliency)
     
     # Plotting
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
@@ -150,8 +154,8 @@ def main():
     axes[2].set_title('Real - Fake Saliency')
     plt.colorbar(im2, ax=axes[2])
     
-    plt.savefig('saliency_maps.png', dpi=300)
-    print("Saliency maps saved to saliency_maps.png")
+    plt.savefig(os.path.join(output_dir, 'saliency_maps.png'), dpi=300)
+    print(f"Saliency maps saved to {output_dir}/saliency_maps.png")
 
     # 1D Projections (Important for mathematical patterns)
     plt.figure(figsize=(10, 6))
@@ -161,7 +165,7 @@ def main():
     plt.xlabel('Prime index (p)')
     plt.ylabel('Saliency')
     plt.legend()
-    plt.savefig('saliency_1d_primes.png')
+    plt.savefig(os.path.join(output_dir, 'saliency_1d_primes.png'))
     
     plt.figure(figsize=(10, 6))
     plt.plot(real_map.mean(axis=1), label='Real (Average over primes)')
@@ -170,7 +174,7 @@ def main():
     plt.xlabel('Dirichlet character index')
     plt.ylabel('Saliency')
     plt.legend()
-    plt.savefig('saliency_1d_twists.png')
+    plt.savefig(os.path.join(output_dir, 'saliency_1d_twists.png'))
 
 if __name__ == "__main__":
     main()
