@@ -225,6 +225,7 @@ def main():
                                mean_across_twists + std_across_twists, 
                                color='red', alpha=0.2, label='Std Dev')
         ax_prime.invert_yaxis()  # Match image coordinates
+        ax_prime.set_ylim(IMAGE_SIZE - 0.5, -0.5) # Force exact alignment with heatmap rows
         ax_prime.set_xlabel('Abs Grad', fontsize=10)
         ax_prime.set_yticks([])
         ax_prime.grid(True, alpha=0.3)
@@ -237,6 +238,7 @@ def main():
                               mean_across_primes - std_across_primes, 
                               mean_across_primes + std_across_primes, 
                               color='blue', alpha=0.2, label='Std Dev')
+        ax_twist.set_xlim(-0.5, IMAGE_SIZE - 0.5) # Force exact alignment with heatmap columns
         ax_twist.set_ylabel('Abs Grad', fontsize=10)
         ax_twist.set_xticks([])
         ax_twist.grid(True, alpha=0.3)
