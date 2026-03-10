@@ -257,9 +257,9 @@ def main():
             
         c_diff_map = c_real_map - c_fake_map
 
-        plot_enhanced_heatmap(c_real_map, f'{c_title_prefix} Real Saliency', f'real_{channel_name}', 'hot')
-        plot_enhanced_heatmap(c_fake_map, f'{c_title_prefix} Fake Saliency', f'fake_{channel_name}', 'hot')
-        plot_enhanced_heatmap(c_diff_map, f'{c_title_prefix} Real - Fake Diff', f'diff_{channel_name}', 'coolwarm')
+        plot_enhanced_heatmap(c_real_map, f'{c_title_prefix} Genuine Curve Saliency', f'genuine_{channel_name}', 'hot')
+        plot_enhanced_heatmap(c_fake_map, f'{c_title_prefix} Fake Curve Saliency', f'fake_{channel_name}', 'hot')
+        plot_enhanced_heatmap(c_diff_map, f'{c_title_prefix} Genuine - Fake Diff', f'diff_{channel_name}', 'coolwarm')
         
         if rank0_indices is not None:
             if channel_idx is not None:
@@ -269,8 +269,8 @@ def main():
                 c_r0_map = rank0_saliency.mean(axis=0)
                 c_r1_map = rank1_saliency.mean(axis=0)
                 
-            plot_enhanced_heatmap(c_r0_map, f'{c_title_prefix} Rank 0 Saliency', f'rank0_{channel_name}', 'hot')
-            plot_enhanced_heatmap(c_r1_map, f'{c_title_prefix} Rank 1 Saliency', f'rank1_{channel_name}', 'hot')
+            plot_enhanced_heatmap(c_r0_map, f'{c_title_prefix} Rank 0 Curve Saliency', f'rank0_{channel_name}', 'hot')
+            plot_enhanced_heatmap(c_r1_map, f'{c_title_prefix} Rank 1 Curve Saliency', f'rank1_{channel_name}', 'hot')
 
     print(f"All plots saved to {output_dir}/")
 
