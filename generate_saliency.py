@@ -192,14 +192,7 @@ def main():
         np.save(os.path.join(output_dir, 'rank0_saliency_avg.npy'), rank0_saliency)
         np.save(os.path.join(output_dir, 'rank1_saliency_avg.npy'), rank1_saliency)
     
-    # Average across channels (Real/Imag parts)
-    real_map = real_saliency.mean(axis=0)
-    fake_map = fake_saliency.mean(axis=0)
-    diff_map = real_map - fake_map
-    
-    if rank0_indices is not None:
-        r0_map = rank0_saliency.mean(axis=0)
-        r1_map = rank1_saliency.mean(axis=0)
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     def plot_enhanced_heatmap(map_data, title, filename_suffix, cmap='hot'):
         # We want to show standard deviation across columns (twists) for each row (prime)
@@ -253,15 +246,36 @@ def main():
         plt.savefig(os.path.join(output_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300)
         plt.close()
 
-    print("Generating enhanced marginal heatmaps...")
-    plot_enhanced_heatmap(real_map, 'Real Saliency', 'real', 'hot')
-    plot_enhanced_heatmap(fake_map, 'Fake Saliency', 'fake', 'hot')
-    plot_enhanced_heatmap(diff_map, 'Real - Fake Difference', 'diff', 'coolwarm')
+    print("Generating enhanced marginal heatmaps for Real Channel, Imag Channel, and Average...")
     
-    if rank0_indices is not None:
-        plot_enhanced_heatmap(r0_map, 'Rank 0 Saliency', 'rank0', 'hot')
-        plot_enhanced_heatmap(r1_map, 'Rank 1 Saliency', 'rank1', 'hot')
+    # Generate plots for Real Channel (index 0), Imag Channel (index 1), and Average
+    for channel_idx, channel_name in [(0, 'real_channel'), (1, 'imag_channel'), (None, 'average')]:
+        if channel_idx is not None:
+            c_real_map = real_saliency[channel_idx]
+            c_fake_map = fake_saliency[channel_idx]
+            c_title_prefix = f"[{channel_name.replace('_', ' ').title()}]"
+        else:
+            c_real_map = real_saliency.mean(axis=0)
+            c_fake_map = fake_saliency.mean(axis=0)
+            c_title_prefix = "[Average Channels]"
+            
+        c_diff_map = c_real_map - c_fake_map
+
+        plot_enhanced_heatmap(c_real_map, f'{c_title_prefix} Real Saliency', f'real_{channel_name}', 'hot')
+        plot_enhanced_heatmap(c_fake_map, f'{c_title_prefix} Fake Saliency', f'fake_{channel_name}', 'hot')
+        plot_enhanced_heatmap(c_diff_map, f'{c_title_prefix} Real - Fake Diff', f'diff_{channel_name}', 'coolwarm')
         
+        if rank0_indices is not None:
+            if channel_idx is not None:
+                c_r0_map = rank0_saliency[channel_idx]
+                c_r1_map = rank1_saliency[channel_idx]
+            else:
+                c_r0_map = rank0_saliency.mean(axis=0)
+                c_r1_map = rank1_saliency.mean(axis=0)
+                
+            plot_enhanced_heatmap(c_r0_map, f'{c_title_prefix} Rank 0 Saliency', f'rank0_{channel_name}', 'hot')
+            plot_enhanced_heatmap(c_r1_map, f'{c_title_prefix} Rank 1 Saliency', f'rank1_{channel_name}', 'hot')
+
     print(f"All plots saved to {output_dir}/")
 
 if __name__ == "__main__":
