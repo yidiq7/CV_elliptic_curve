@@ -195,13 +195,12 @@ def main():
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     def plot_enhanced_heatmap(map_data, title, filename_suffix, cmap='hot'):
-        # We want to show standard deviation across columns (twists) for each row (prime)
-        std_across_twists = map_data.std(axis=1)
-        mean_across_twists = map_data.mean(axis=1)
+        # Due to recent data pipeline updates, Axis 0 (Rows) = Twists, Axis 1 (Columns) = Primes
+        std_across_primes = map_data.std(axis=1)
+        mean_across_primes = map_data.mean(axis=1)
         
-        # We want to show standard deviation across rows (primes) for each column (twist)
-        std_across_primes = map_data.std(axis=0)
-        mean_across_primes = map_data.mean(axis=0)
+        std_across_twists = map_data.std(axis=0)
+        mean_across_twists = map_data.mean(axis=0)
 
         fig, ax = plt.subplots(figsize=(10, 8))
         
@@ -211,38 +210,33 @@ def main():
         
         im = ax.imshow(map_data, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax)
         ax.set_title(f'{title} (N={IMAGE_SIZE})', fontsize=14)
-        ax.set_ylabel('Primes ($p$)', fontsize=12)
-        ax.set_xlabel('Twists ($\chi$)', fontsize=12)
+        ax.set_ylabel('Twists ($\chi$)', fontsize=12) # Swapped
+        ax.set_xlabel('Primes ($p$)', fontsize=12) # Swapped
 
         # Create dividers for marginal plots
         divider = make_axes_locatable(ax)
         
-        # Marginal plot for Primes (Right side) - Projection onto Primes
-        ax_prime = divider.append_axes("right", size="20%", pad=0.1)
-        ax_prime.plot(mean_across_twists, range(IMAGE_SIZE), color='red', label='Mean Saliency')
-        ax_prime.fill_betweenx(range(IMAGE_SIZE), 
-                               mean_across_twists - std_across_twists, 
-                               mean_across_twists + std_across_twists, 
-                               color='red', alpha=0.2, label='Std Dev')
-        ax_prime.invert_yaxis()  # Match image coordinates
-        ax_prime.set_ylim(IMAGE_SIZE - 0.5, -0.5) # Force exact alignment with heatmap rows
-        ax_prime.set_xlabel('Abs Grad', fontsize=10)
-        ax_prime.set_yticks([])
-        ax_prime.grid(True, alpha=0.3)
-        ax_prime.legend(loc='upper right', fontsize=8)
-        
-        # Marginal plot for Twists (Top side) - Projection onto Twists
-        ax_twist = divider.append_axes("top", size="20%", pad=0.1)
-        ax_twist.plot(range(IMAGE_SIZE), mean_across_primes, color='blue', label='Mean Saliency')
-        ax_twist.fill_between(range(IMAGE_SIZE), 
-                              mean_across_primes - std_across_primes, 
-                              mean_across_primes + std_across_primes, 
-                              color='blue', alpha=0.2, label='Std Dev')
-        ax_twist.set_xlim(-0.5, IMAGE_SIZE - 0.5) # Force exact alignment with heatmap columns
-        ax_twist.set_ylabel('Abs Grad', fontsize=10)
-        ax_twist.set_xticks([])
+        # Marginal plot for Twists (Right side) - Projection onto Twists
+        ax_twist = divider.append_axes("right", size="20%", pad=0.1)
+        # Using a bar plot instead of a line plot prevents the "barcode/zigzag" artifact for sparse, volatile data
+        ax_twist.barh(range(IMAGE_SIZE), mean_across_primes, color='red', alpha=0.7, label='Mean Saliency')
+        ax_twist.errorbar(mean_across_primes, range(IMAGE_SIZE), xerr=std_across_primes, fmt='none', ecolor='red', alpha=0.2)
+        ax_twist.invert_yaxis()  # Match image coordinates
+        ax_twist.set_ylim(IMAGE_SIZE - 0.5, -0.5) 
+        ax_twist.set_xlabel('Abs Grad', fontsize=10)
+        ax_twist.set_yticks([])
         ax_twist.grid(True, alpha=0.3)
         ax_twist.legend(loc='upper right', fontsize=8)
+        
+        # Marginal plot for Primes (Top side) - Projection onto Primes
+        ax_prime = divider.append_axes("top", size="20%", pad=0.1)
+        ax_prime.bar(range(IMAGE_SIZE), mean_across_twists, color='blue', alpha=0.7, label='Mean Saliency')
+        ax_prime.errorbar(range(IMAGE_SIZE), mean_across_twists, yerr=std_across_twists, fmt='none', ecolor='blue', alpha=0.2)
+        ax_prime.set_xlim(-0.5, IMAGE_SIZE - 0.5) 
+        ax_prime.set_ylabel('Abs Grad', fontsize=10)
+        ax_prime.set_xticks([])
+        ax_prime.grid(True, alpha=0.3)
+        ax_prime.legend(loc='upper right', fontsize=8)
 
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300)
