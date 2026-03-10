@@ -13,7 +13,8 @@ from tqdm import tqdm
 #SIZE = 100
 SIZE = int(sys.argv[1])
 GENERATE_REAL = True 
-GENERATE_FAKE = True
+GENERATE_FAKE = False
+SAVE_RGB_IMAGES = False
 
 primes = np.array([sympy.prime(i) for i in range(1, SIZE+1)])  # primes[0] = 2, primes[99] = 541
 
@@ -117,14 +118,19 @@ if GENERATE_REAL:
 
     for i, curve in enumerate(tqdm(aplist, desc="Processing real curves", unit="curve")):
         ap = curve[2][:SIZE]
-        img_array = twisted_image_from_ap(ap)
-        combined_array[i] = img_array
-        
-        # Optional: save individual images
-        # img_array_clipped = np.clip(img_array, 0, 1)
-        # img_array_uint8 = (img_array_clipped * 255).astype(np.uint8)
-        # img = Image.fromarray(img_array_uint8, 'RGB')
-        # img.save(f"./coloured/ECcoloured{i+1}_{SIZE}.png")
+        if not SAVE_RGB_IMAGES:
+            img_array = twisted_image_from_ap(ap)
+            combined_array[i] = img_array
+
+        else:
+            # Optional: save individual images
+            img_array = twisted_image_from_ap(ap, rgb=True)
+            img_array_clipped = np.clip(img_array, 0, 1)
+            img_array_uint8 = (img_array_clipped * 255).astype(np.uint8)
+            img = Image.fromarray(img_array_uint8, 'RGB')
+            img.save(f"./coloured/ECcoloured{i+1}_{SIZE}.png")
+            #if i == 2:
+            #    break
 
     # Flush to disk
     del combined_array
