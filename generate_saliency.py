@@ -86,7 +86,8 @@ def compute_average_saliency(model, loader, device, num_samples=None):
         
         # Saliency is the absolute value of the gradient
         saliency = batch.grad.data.abs()
-        batch_avg = saliency.sum(dim=0)
+        # Sum over batch and move immediately to CPU to prevent OOM
+        batch_avg = saliency.sum(dim=0).cpu()
         
         if avg_saliency is None:
             avg_saliency = batch_avg
@@ -97,7 +98,7 @@ def compute_average_saliency(model, loader, device, num_samples=None):
         if num_samples is not None and samples_processed >= num_samples:
             break
             
-    return (avg_saliency / samples_processed).cpu().numpy()
+    return (avg_saliency / samples_processed).numpy()
 
 def get_rank_indices(csv_path):
     rank0_indices = []
