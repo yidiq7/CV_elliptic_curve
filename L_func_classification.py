@@ -102,30 +102,30 @@ class LFunctionCNN(nn.Module):
             nn.Conv2d(in_channels=2, out_channels=64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (64, 100, 100)
+            nn.AvgPool2d(kernel_size=2, stride=2), # Output: (64, 100, 100)
 
             # Block 2
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (128, 50, 50)
+            nn.AvgPool2d(kernel_size=2, stride=2), # Output: (128, 50, 50)
 
             # Block 3
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (256, 25, 25)
+            nn.AvgPool2d(kernel_size=2, stride=2), # Output: (256, 25, 25)
 
             # Block 4
             nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512), # ADDED: Batch Normalization
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2), # Output: (512, 12, 12)
+            nn.AvgPool2d(kernel_size=2, stride=2), # Output: (512, 12, 12)
 
             nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2)  # Output: (512, 6, 6)
+            nn.AvgPool2d(kernel_size=2, stride=2)  # Output: (512, 6, 6)
         )
 
         self.classifier = nn.Sequential(
