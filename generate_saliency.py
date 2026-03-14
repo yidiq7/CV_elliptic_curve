@@ -70,34 +70,65 @@ class SaliencyDataset(Dataset):
         feature_tensor = torch.FloatTensor(feature).permute(2, 0, 1)
         return feature_tensor
 
-def compute_average_saliency(model, loader, device, num_samples=None):
+def compute_average_saliency(model, loader, device, num_samples=None,
+                              smooth_grad_n=50, smooth_grad_sigma=0.1):
+    """Compute average saliency using SmoothGrad to avoid MaxPool gradient sparsity.
+
+    Vanilla gradients through MaxPool2d only flow to argmax positions, creating
+    periodic stripe artifacts (especially visible at N=300). SmoothGrad averages
+    gradients over many noisy copies of each input, distributing gradient across
+    all spatial positions.
+
+    Args:
+        smooth_grad_n: Number of noisy samples per input (0 = vanilla gradient).
+        smooth_grad_sigma: Noise std as a fraction of the input range.
+    """
     model.eval()
     avg_saliency = None
     samples_processed = 0
-    
+
     for batch in loader:
         batch = batch.to(device)
-        batch.requires_grad = True
-        
-        outputs = model(batch)
-        score = outputs.sum()
-        model.zero_grad()
-        score.backward()
-        
-        # Saliency is the absolute value of the gradient
-        saliency = batch.grad.data.abs()
+
+        if smooth_grad_n > 0:
+            # SmoothGrad: average gradient over noisy copies
+            input_range = batch.max() - batch.min()
+            noise_std = smooth_grad_sigma * input_range
+            smooth_grad_accum = torch.zeros_like(batch)
+
+            for _ in range(smooth_grad_n):
+                noisy = batch + torch.randn_like(batch) * noise_std
+                noisy.requires_grad = True
+
+                outputs = model(noisy)
+                score = outputs.sum()
+                model.zero_grad()
+                score.backward()
+
+                smooth_grad_accum += noisy.grad.data.abs()
+
+            saliency = smooth_grad_accum / smooth_grad_n
+        else:
+            # Vanilla gradient (original behavior)
+            batch.requires_grad = True
+            outputs = model(batch)
+            score = outputs.sum()
+            model.zero_grad()
+            score.backward()
+            saliency = batch.grad.data.abs()
+
         # Sum over batch and move immediately to CPU to prevent OOM
         batch_avg = saliency.sum(dim=0).cpu()
-        
+
         if avg_saliency is None:
             avg_saliency = batch_avg
         else:
             avg_saliency += batch_avg
-            
+
         samples_processed += len(batch)
         if num_samples is not None and samples_processed >= num_samples:
             break
-            
+
     return (avg_saliency / samples_processed).numpy()
 
 def get_rank_indices(csv_path):
@@ -193,15 +224,13 @@ def main():
         np.save(os.path.join(output_dir, 'rank0_saliency_avg.npy'), rank0_saliency)
         np.save(os.path.join(output_dir, 'rank1_saliency_avg.npy'), rank1_saliency)
     
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-
     def plot_enhanced_heatmap(map_data, title, filename_suffix, cmap='hot'):
         # Axis 0 (Rows) = Primes, Axis 1 (Columns) = Twists
         std_across_twists = map_data.std(axis=1)
-        mean_across_twists = map_data.mean(axis=1)
+        max_across_twists = map_data.max(axis=1)
         
         std_across_primes = map_data.std(axis=0)
-        mean_across_primes = map_data.mean(axis=0)
+        max_across_primes = map_data.max(axis=0)
 
         fig, ax = plt.subplots(figsize=(10, 8))
         fig.suptitle(f'{title} (N={IMAGE_SIZE})', fontsize=16, y=0.98)
@@ -219,10 +248,10 @@ def main():
         
         # Marginal plot for Primes (Right side) - Projection onto Primes
         ax_prime = divider.append_axes("right", size="20%", pad=0.1)
-        ax_prime.plot(mean_across_twists, range(IMAGE_SIZE), color='red', label='Mean Saliency')
+        ax_prime.plot(max_across_twists, range(IMAGE_SIZE), color='red', label='Max Saliency')
         ax_prime.fill_betweenx(range(IMAGE_SIZE), 
-                               mean_across_twists - std_across_twists, 
-                               mean_across_twists + std_across_twists, 
+                               max_across_twists - std_across_twists, 
+                               max_across_twists + std_across_twists, 
                                color='red', alpha=0.2, label='Std Dev')
         ax_prime.invert_yaxis()  # Match image coordinates
         ax_prime.set_ylim(IMAGE_SIZE - 0.5, -0.5) 
@@ -234,10 +263,10 @@ def main():
         
         # Marginal plot for Twists (Top side) - Projection onto Twists
         ax_twist = divider.append_axes("top", size="20%", pad=0.1)
-        ax_twist.plot(range(IMAGE_SIZE), mean_across_primes, color='blue', label='Mean Saliency')
+        ax_twist.plot(range(IMAGE_SIZE), max_across_primes, color='blue', label='Max Saliency')
         ax_twist.fill_between(range(IMAGE_SIZE), 
-                              mean_across_primes - std_across_primes, 
-                              mean_across_primes + std_across_primes, 
+                              max_across_primes - std_across_primes, 
+                              max_across_primes + std_across_primes, 
                               color='blue', alpha=0.2, label='Std Dev')
         ax_twist.set_xlim(-0.5, IMAGE_SIZE - 0.5) 
         ax_twist.margins(x=0) # Remove blanks on left/right
