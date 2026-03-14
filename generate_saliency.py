@@ -203,13 +203,13 @@ def main():
         mean_across_primes = map_data.mean(axis=0)
 
         fig, ax = plt.subplots(figsize=(10, 8))
+        fig.suptitle(f'{title} (N={IMAGE_SIZE})', fontsize=16, y=0.98)
         
         # Clip to a high percentile to prevent a single pixel from washing out the colormap
         vmax = np.percentile(np.abs(map_data), 99.5)
         vmin = -vmax if cmap == 'coolwarm' else 0
         
         im = ax.imshow(map_data, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax)
-        ax.set_title(f'{title} (N={IMAGE_SIZE})', fontsize=14)
         ax.set_ylabel('Primes ($p$)', fontsize=12)
         ax.set_xlabel('Twists ($\chi$)', fontsize=12)
 
@@ -245,7 +245,8 @@ def main():
         ax_twist.grid(True, alpha=0.3)
         ax_twist.legend(loc='upper right', fontsize=8)
 
-        plt.tight_layout()
+        # Use rect to ensure suptitle is not clipped or overlapped
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig(os.path.join(output_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300)
         plt.close()
 
