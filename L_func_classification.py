@@ -27,7 +27,7 @@ CLASS_WEIGHT_RATIO = 3.0
 OPTIMAL_THRESHOLD = 0.5
 
 # Resume training configuration
-RESUME_TRAINING = True # Set to False to start fresh
+RESUME_TRAINING = True# Set to False to start fresh
 
 # --- 2. Data Loading and Preprocessing ---
 
@@ -222,7 +222,7 @@ best_model_state = None
 
 if RESUME_TRAINING:
     try:
-        checkpoint = torch.load(f'L_function_classifier_{IMAGE_SIZE}_checkpoint.pth', map_location=DEVICE)
+        checkpoint = torch.load(f'L_function_classifier_avgpool_{IMAGE_SIZE}_checkpoint.pth', map_location=DEVICE)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         START_EPOCH = checkpoint['epoch']
@@ -344,8 +344,8 @@ checkpoint = {
     'optimizer_state_dict': optimizer.state_dict(),
     'best_val_f1_real': best_val_f1_real,
 }
-torch.save(checkpoint, f'L_function_classifier_{IMAGE_SIZE}_checkpoint.pth')
-print(f"\nCheckpoint saved to L_function_classifier_{IMAGE_SIZE}_checkpoint.pth")
+torch.save(checkpoint, f'L_function_classifier_avgpool_{IMAGE_SIZE}_checkpoint.pth')
+print(f"\nCheckpoint saved to L_function_classifier_avgpool_{IMAGE_SIZE}_checkpoint.pth")
 
 # --- Final Evaluation with Confusion Matrix ---
 print("\n" + "="*50)
