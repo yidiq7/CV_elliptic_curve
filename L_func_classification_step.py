@@ -109,7 +109,7 @@ def calculate_metrics_step(predictions, labels):
     f1_real = 2 * (precision_real * recall_real) / (precision_real + recall_real + eps)
     return precision_real, recall_real, f1_real
 
-print("\nStarting training (Intra-Epoch Reporting every 100 steps)...")
+print("\nStarting training (Intra-Epoch Reporting every 5 steps)...")
 print("-" * 120)
 print(f"{'Step':^7} | {'Loss':^8} | {'Train P(Real)':^13} | {'Train R(Real)':^13} | {'Train F1(Real)':^14} | {'Val P(Real)':^11} | {'Val R(Real)':^11} | {'Val F1(Real)':^12} | {'Time':^11}")
 print("-" * 120)
@@ -141,12 +141,12 @@ for features, labels in train_loader:
         all_train_preds.append(preds)
         all_train_labels.append(labels)
         
-    if step % 100 == 0:
-        # Calculate training metrics for the last 100 steps
+    if step % 5 == 0:
+        # Calculate training metrics for the last 5 steps
         train_preds_tensor = torch.cat(all_train_preds)
         train_labels_tensor = torch.cat(all_train_labels)
         train_p, train_r, train_f1 = calculate_metrics_step(train_preds_tensor, train_labels_tensor)
-        avg_train_loss = running_loss / 100
+        avg_train_loss = running_loss / 5
         
         # Evaluate on FULL validation set
         model.eval()
@@ -174,12 +174,15 @@ for features, labels in train_loader:
         # Print matching original format
         print(f"{step:^7} | {avg_train_loss:^8.4f} | {train_p:^13.4f} | {train_r:^13.4f} | {train_f1:^14.4f} | {val_p:^11.4f} | {val_r:^11.4f} | {val_f1:^12.4f} | {step_time:^11.4f}")
         
-        # Reset training accumulators for the next 100 steps
+        # Reset training accumulators for the next 5 steps
         model.train()
         running_loss = 0.0
         all_train_preds = []
         all_train_labels = []
         step_start_time = time.time()
+        
+    if step >= 50:
+        break
 
 print("-" * 120)
-print(f"Epoch finished in {time.time() - start_time:.2f} seconds.")
+print(f"Finished in {time.time() - start_time:.2f} seconds.")
