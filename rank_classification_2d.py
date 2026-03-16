@@ -200,13 +200,13 @@ def plot_enhanced_heatmap(map_data, title, filepath, image_size, cmap='hot'):
     std_across_primes = map_data.std(axis=0)
     mean_across_primes = map_data.mean(axis=0)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(12, 8))
     fig.suptitle(f'{title} (N={image_size})', fontsize=16, y=0.98)
 
     vmax = np.percentile(np.abs(map_data), 99.5)
     vmin = -vmax if cmap == 'coolwarm' else 0
 
-    im = ax.imshow(map_data, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax)
+    im = ax.imshow(map_data, cmap=cmap, aspect='equal', vmin=vmin, vmax=vmax)
     ax.set_ylabel('Primes ($p$)', fontsize=12)
     ax.set_xlabel('Twists ($\\chi$)', fontsize=12)
 
@@ -227,6 +227,10 @@ def plot_enhanced_heatmap(map_data, title, filepath, image_size, cmap='hot'):
     ax_prime.grid(True, alpha=0.3)
     ax_prime.legend(loc='upper right', fontsize=8)
 
+    # Colorbar to the right of the marginal plot
+    ax_cbar = divider.append_axes("right", size="3%", pad=0.15)
+    plt.colorbar(im, cax=ax_cbar)
+
     # Marginal: projection onto twists (top side)
     ax_twist = divider.append_axes("top", size="20%", pad=0.1)
     ax_twist.plot(range(image_size), mean_across_primes, color='blue', label='Mean')
@@ -242,7 +246,7 @@ def plot_enhanced_heatmap(map_data, title, filepath, image_size, cmap='hot'):
     ax_twist.legend(loc='upper right', fontsize=8)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig(filepath, dpi=300)
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
     plt.close()
 
 
@@ -482,11 +486,27 @@ def main():
             saliency_results[key] = sal
             np.save(os.path.join(output_dir, f'{key}_saliency_avg.npy'), sal)
 
+    # Compute combined saliency: weighted average of per-rank saliencies
+    # (each curve backpropagated w.r.t. its own rank's logit)
+    rank_counts = [len(rank_indices[r]) for r in range(NUM_CLASSES)]
+    total = sum(rank_counts)
+    combined_sal = None
+    for r in range(NUM_CLASSES):
+        key = f'rank{r}_wrt_class{r}'
+        if key in saliency_results and rank_counts[r] > 0:
+            weighted = saliency_results[key] * (rank_counts[r] / total)
+            combined_sal = weighted if combined_sal is None else combined_sal + weighted
+    if combined_sal is not None:
+        saliency_results['all_combined'] = combined_sal
+        np.save(os.path.join(output_dir, 'all_combined_saliency_avg.npy'), combined_sal)
+        print(f"Combined saliency computed (weighted by rank counts: {rank_counts})")
+
     # Generate plots
     print("\nGenerating saliency heatmaps...")
 
     channel_configs = [(0, 'real_channel'), (1, 'imag_channel'), (None, 'average')]
 
+    # Per-rank plots: rank R curves, gradient w.r.t. class R logit
     for rank in range(NUM_CLASSES):
         key_own = f'rank{rank}_wrt_class{rank}'
         if key_own not in saliency_results:
@@ -503,6 +523,16 @@ def main():
             ch_label = ch_name.replace('_', ' ').title()
             title = f'[{ch_label}] Rank {rank} Saliency (w.r.t. class {rank})'
             fname = os.path.join(output_dir, f'enhanced_marginal_rank{rank}_{ch_name}.png')
+            plot_enhanced_heatmap(sal_map, title, fname, image_size, 'hot')
+
+    # All-ranks-combined plot (each curve w.r.t. its own rank)
+    if 'all_combined' in saliency_results:
+        sal = saliency_results['all_combined']
+        for ch_idx, ch_name in channel_configs:
+            sal_map = sal[ch_idx] if ch_idx is not None else sal.mean(axis=0)
+            ch_label = ch_name.replace('_', ' ').title()
+            title = f'[{ch_label}] All Curves Combined Saliency'
+            fname = os.path.join(output_dir, f'enhanced_marginal_all_combined_{ch_name}.png')
             plot_enhanced_heatmap(sal_map, title, fname, image_size, 'hot')
 
     # Difference maps between rank pairs
