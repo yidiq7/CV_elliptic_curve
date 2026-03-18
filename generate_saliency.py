@@ -16,23 +16,23 @@ class LFunctionCNN(nn.Module):
             nn.Conv2d(in_channels=2, out_channels=64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.AvgPool2d(kernel_size=2, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
-            nn.AvgPool2d(kernel_size=2, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(),
-            nn.AvgPool2d(kernel_size=2, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(),
-            nn.AvgPool2d(kernel_size=2, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1),
             nn.BatchNorm2d(512),
             nn.ReLU(),
-            nn.AvgPool2d(kernel_size=2, stride=2)
+            nn.MaxPool2d(kernel_size=2, stride=2)
         )
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -203,43 +203,47 @@ def main():
         std_across_primes = map_data.std(axis=0)
         mean_across_primes = map_data.mean(axis=0)
 
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(12, 8))
         fig.suptitle(f'{title} (N={IMAGE_SIZE})', fontsize=16, y=0.98)
-        
+
         # Clip to a high percentile to prevent a single pixel from washing out the colormap
         vmax = np.percentile(np.abs(map_data), 99.5)
         vmin = -vmax if cmap == 'coolwarm' else 0
-        
-        im = ax.imshow(map_data, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax)
+
+        im = ax.imshow(map_data, cmap=cmap, aspect='equal', vmin=vmin, vmax=vmax)
         ax.set_ylabel('Primes ($p$)', fontsize=12)
-        ax.set_xlabel('Twists ($\chi$)', fontsize=12)
+        ax.set_xlabel('Twists ($\\chi$)', fontsize=12)
 
         # Create dividers for marginal plots
         divider = make_axes_locatable(ax)
-        
+
         # Marginal plot for Primes (Right side) - Projection onto Primes
         ax_prime = divider.append_axes("right", size="20%", pad=0.1)
         ax_prime.plot(mean_across_twists, range(IMAGE_SIZE), color='red', label='Mean Saliency')
-        ax_prime.fill_betweenx(range(IMAGE_SIZE), 
-                               mean_across_twists - std_across_twists, 
-                               mean_across_twists + std_across_twists, 
+        ax_prime.fill_betweenx(range(IMAGE_SIZE),
+                               mean_across_twists - std_across_twists,
+                               mean_across_twists + std_across_twists,
                                color='red', alpha=0.2, label='Std Dev')
         ax_prime.invert_yaxis()  # Match image coordinates
-        ax_prime.set_ylim(IMAGE_SIZE - 0.5, -0.5) 
+        ax_prime.set_ylim(IMAGE_SIZE - 0.5, -0.5)
         ax_prime.margins(y=0) # Remove blanks on top/bottom
         ax_prime.set_xlabel('Abs Grad', fontsize=10)
         ax_prime.set_yticks([])
         ax_prime.grid(True, alpha=0.3)
         ax_prime.legend(loc='upper right', fontsize=8)
-        
+
+        # Colorbar to the right of the marginal plot
+        ax_cbar = divider.append_axes("right", size="3%", pad=0.15)
+        plt.colorbar(im, cax=ax_cbar)
+
         # Marginal plot for Twists (Top side) - Projection onto Twists
         ax_twist = divider.append_axes("top", size="20%", pad=0.1)
         ax_twist.plot(range(IMAGE_SIZE), mean_across_primes, color='blue', label='Mean Saliency')
-        ax_twist.fill_between(range(IMAGE_SIZE), 
-                              mean_across_primes - std_across_primes, 
-                              mean_across_primes + std_across_primes, 
+        ax_twist.fill_between(range(IMAGE_SIZE),
+                              mean_across_primes - std_across_primes,
+                              mean_across_primes + std_across_primes,
                               color='blue', alpha=0.2, label='Std Dev')
-        ax_twist.set_xlim(-0.5, IMAGE_SIZE - 0.5) 
+        ax_twist.set_xlim(-0.5, IMAGE_SIZE - 0.5)
         ax_twist.margins(x=0) # Remove blanks on left/right
         ax_twist.set_ylabel('Abs Grad', fontsize=10)
         ax_twist.set_xticks([])
@@ -248,7 +252,7 @@ def main():
 
         # Use rect to ensure suptitle is not clipped or overlapped
         plt.tight_layout(rect=[0, 0, 1, 0.95])
-        plt.savefig(os.path.join(output_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300)
+        plt.savefig(os.path.join(output_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300, bbox_inches='tight')
         plt.close()
 
     print("Generating enhanced marginal heatmaps for Real Channel, Imag Channel, and Average...")
