@@ -302,13 +302,9 @@ def main():
 
     print(f"Training samples: {train_size}, Validation samples: {val_size}")
 
-    # Compute class weights (inverse frequency)
-    class_weights = torch.FloatTensor([len(valid_indices) / (NUM_CLASSES * rank_counts[r]) for r in range(NUM_CLASSES)])
-    print(f"Class weights: {class_weights.tolist()}")
-
     # Model, loss, optimizer
     model = RankCNN(num_classes=NUM_CLASSES).to(DEVICE)
-    criterion = nn.CrossEntropyLoss(weight=class_weights.to(DEVICE))
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     print("\nModel Architecture:")
