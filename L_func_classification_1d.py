@@ -6,28 +6,53 @@ from torch.utils.data import Dataset, DataLoader, random_split, ConcatDataset
 from torch.amp import autocast, GradScaler
 import time
 
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="L-function CNN Training (1D)")
+    
+    # Experiment Setup
+    parser.add_argument("--image_size", type=int, default=200, help="Size of the input images")
+    parser.add_argument("--resume", action="store_true", help="Resume training from checkpoint")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for data splitting")
+    
+    # Hyperparameters
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
+    
+    # Data/Loss weights
+    parser.add_argument("--weight_ratio", type=float, default=3.0, help="Class weight for Real data")
+    parser.add_argument("--split", type=float, default=0.8, help="Train/Val split ratio")
+    
+    return parser.parse_args()
+
+args = parse_args()
+
 # --- 1. Configuration and Hyperparameters ---
-# Decide which device to use (GPU if available, otherwise CPU)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {DEVICE}")
 
 # Hyperparameters
-LEARNING_RATE = 0.001
-BATCH_SIZE = 256
-EPOCHS = 100
-TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
+LEARNING_RATE = args.lr
+BATCH_SIZE = args.batch_size
+EPOCHS = args.epochs
+TRAIN_VAL_SPLIT_RATIO = args.split
 
 # File paths for your data
-IMAGE_SIZE = 200
+IMAGE_SIZE = args.image_size
 REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
 FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
 
 # Class imbalance ratio (fake:real = 10:1)
-CLASS_WEIGHT_RATIO = 3.0
+CLASS_WEIGHT_RATIO = args.weight_ratio
 OPTIMAL_THRESHOLD = 0.5
 
 # Resume training configuration
-RESUME_TRAINING = True # Set to False to start fresh
+RESUME_TRAINING = args.resume
+
+# Random Seed
+RANDOM_SEED = args.seed
 
 # --- 2. Data Loading and Preprocessing ---
 
@@ -88,7 +113,7 @@ full_dataset = ConcatDataset([real_dataset, fake_dataset])
 
 # Split into training and validation sets
 # Note: We create a generator for reproducibility in splitting
-g = torch.Generator().manual_seed(42)
+g = torch.Generator().manual_seed(RANDOM_SEED)
 train_size = int(TRAIN_VAL_SPLIT_RATIO * len(full_dataset))
 val_size = len(full_dataset) - train_size
 train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size], generator=g)
