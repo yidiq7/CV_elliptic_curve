@@ -18,7 +18,7 @@ EPOCHS = 100
 TRAIN_VAL_SPLIT_RATIO = 0.8 # 80% for training, 20% for validation
 
 # File paths for your data
-IMAGE_SIZE = 500
+IMAGE_SIZE = 200
 REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
 FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
 
@@ -27,7 +27,7 @@ CLASS_WEIGHT_RATIO = 3.0
 OPTIMAL_THRESHOLD = 0.5
 
 # Resume training configuration
-RESUME_TRAINING = False # Set to False to start fresh
+RESUME_TRAINING = True # Set to False to start fresh
 
 # --- 2. Data Loading and Preprocessing ---
 
