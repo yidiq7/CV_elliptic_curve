@@ -200,9 +200,9 @@ def compute_class_saliency(model, loader, device, class_idx, num_samples=None):
 
 def plot_enhanced_heatmap(map_data, title, filepath, image_size, cmap='hot'):
     std_across_twists = map_data.std(axis=1)
-    max_across_twists = map_data.max(axis=1)
+    mean_across_twists = map_data.mean(axis=1)
     std_across_primes = map_data.std(axis=0)
-    max_across_primes = map_data.max(axis=0)
+    mean_across_primes = map_data.mean(axis=0)
 
     fig, ax = plt.subplots(figsize=(12, 8))
     fig.suptitle(f'{title} (N={image_size})', fontsize=16, y=0.98)
@@ -218,10 +218,10 @@ def plot_enhanced_heatmap(map_data, title, filepath, image_size, cmap='hot'):
 
     # Marginal: projection onto primes (right side)
     ax_prime = divider.append_axes("right", size="20%", pad=0.1)
-    ax_prime.plot(max_across_twists, range(image_size), color='red', label='Max Saliency')
+    ax_prime.plot(mean_across_twists, range(image_size), color='red', label='Mean')
     ax_prime.fill_betweenx(range(image_size),
-                           max_across_twists - std_across_twists,
-                           max_across_twists + std_across_twists,
+                           mean_across_twists - std_across_twists,
+                           mean_across_twists + std_across_twists,
                            color='red', alpha=0.2, label='Std')
     ax_prime.invert_yaxis()
     ax_prime.set_ylim(image_size - 0.5, -0.5)
@@ -237,10 +237,10 @@ def plot_enhanced_heatmap(map_data, title, filepath, image_size, cmap='hot'):
 
     # Marginal: projection onto twists (top side)
     ax_twist = divider.append_axes("top", size="20%", pad=0.1)
-    ax_twist.plot(range(image_size), max_across_primes, color='blue', label='Max Saliency')
+    ax_twist.plot(range(image_size), mean_across_primes, color='blue', label='Mean')
     ax_twist.fill_between(range(image_size),
-                          max_across_primes - std_across_primes,
-                          max_across_primes + std_across_primes,
+                          mean_across_primes - std_across_primes,
+                          mean_across_primes + std_across_primes,
                           color='blue', alpha=0.2, label='Std')
     ax_twist.set_xlim(-0.5, image_size - 0.5)
     ax_twist.margins(x=0)
