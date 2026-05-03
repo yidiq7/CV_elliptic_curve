@@ -6,7 +6,7 @@ from sage.all import DirichletGroup
 
 # Set the maximum modulus
 N_max = 500
-output_filename = os.path.join(DATA_DIR, 'chifull_500.txt')
+output_filename = os.path.join(DATA_DIR, 'chiprimitive.txt')
 
 # This will store all the character lists
 all_characters = []
@@ -22,7 +22,7 @@ for N in range(1, N_max + 1):
     for chi in G:
         if chi.is_primitive():
             # .list() returns the values [chi(0), chi(1), ..., chi(N-1)]
-                all_characters.append(chi.list())
+                all_characters.append(chi.values())
 
 print(f"Total number of characters generated: {len(all_characters)}")
 

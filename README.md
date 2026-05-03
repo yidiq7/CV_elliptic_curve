@@ -21,7 +21,8 @@ plots/                           # figures
 
 ### `src/data_generation/`
 
-- **`get_chi.py`** — Generates all primitive Dirichlet characters via SageMath
+- **`get_chi.py`** — Retrieves $a_p$ sequences.
+- **`get_chi.py`** — Retrieves primitive Dirichlet characters.
 - **`generate_fake_ap.py`** — Produces synthetic $a_p$ sequences by rejection-sampling angles from the Sato–Tate distribution.
 - **`generate_image.py`** — Converts $a_p$ sequences into 2D twisted images using the Dirichlet characters from `get_chi.py`. 
 
