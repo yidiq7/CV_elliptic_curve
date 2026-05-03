@@ -464,7 +464,7 @@ def main():
     for r in range(NUM_CLASSES):
         print(f"  Rank {r}: {len(rank_indices[r])} curves")
 
-    output_dir = f'saliency_maps_rank_{image_size}'
+    output_dir = os.path.join(RESULTS_DIR, f'saliency_maps_rank_{image_size}')
     os.makedirs(output_dir, exist_ok=True)
 
     # Compute saliency for each rank group w.r.t. each class logit

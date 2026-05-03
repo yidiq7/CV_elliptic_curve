@@ -9,7 +9,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def plot_enhanced_heatmap(size):
     folder = f'saliency_maps_{size}'
-    fake_path = os.path.join(DATA_DIR, folder, 'fake_saliency_avg.npy')
+    fake_path = os.path.join(RESULTS_DIR, folder, 'fake_saliency_avg.npy')
     
     if not os.path.exists(fake_path):
         return

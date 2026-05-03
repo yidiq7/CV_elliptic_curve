@@ -186,7 +186,7 @@ def main():
     fake_saliency = compute_average_saliency(model, fake_loader, DEVICE, NUM_SAMPLES)
     
     # Create output directory
-    output_dir = os.path.join(DATA_DIR, f'saliency_maps_{IMAGE_SIZE}')
+    output_dir = os.path.join(RESULTS_DIR, f'saliency_maps_{IMAGE_SIZE}')
     os.makedirs(output_dir, exist_ok=True)
 
     # Save raw data

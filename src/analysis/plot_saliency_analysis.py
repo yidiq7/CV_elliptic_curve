@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import os
 
 def analyze_saliency(folder, size):
-    rank0_path = os.path.join(DATA_DIR, folder, 'rank0_saliency_avg.npy')
-    rank1_path = os.path.join(DATA_DIR, folder, 'rank1_saliency_avg.npy')
-    fake_path = os.path.join(DATA_DIR, folder, 'fake_saliency_avg.npy')
+    rank0_path = os.path.join(RESULTS_DIR, folder, 'rank0_saliency_avg.npy')
+    rank1_path = os.path.join(RESULTS_DIR, folder, 'rank1_saliency_avg.npy')
+    fake_path = os.path.join(RESULTS_DIR, folder, 'fake_saliency_avg.npy')
     
     if not (os.path.exists(rank0_path) and os.path.exists(rank1_path) and os.path.exists(fake_path)):
         print(f"Skipping {folder}, missing data files.")

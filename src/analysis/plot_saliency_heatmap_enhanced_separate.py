@@ -67,9 +67,9 @@ def plot_enhanced_heatmap(size, map_data, title, filename_suffix, cmap='hot'):
 
 def process_folder(size):
     folder = f'saliency_maps_{size}'
-    rank0_path = os.path.join(DATA_DIR, folder, 'rank0_saliency_avg.npy')
-    rank1_path = os.path.join(DATA_DIR, folder, 'rank1_saliency_avg.npy')
-    fake_path = os.path.join(DATA_DIR, folder, 'fake_saliency_avg.npy')
+    rank0_path = os.path.join(RESULTS_DIR, folder, 'rank0_saliency_avg.npy')
+    rank1_path = os.path.join(RESULTS_DIR, folder, 'rank1_saliency_avg.npy')
+    fake_path = os.path.join(RESULTS_DIR, folder, 'fake_saliency_avg.npy')
     
     if not (os.path.exists(rank0_path) and os.path.exists(fake_path)):
         return

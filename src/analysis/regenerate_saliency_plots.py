@@ -85,7 +85,7 @@ def regenerate_for_size(image_size):
     for rank in range(NUM_CLASSES):
         for tc in range(NUM_CLASSES):
             key = f'rank{rank}_wrt_class{tc}'
-            path = os.path.join(DATA_DIR, f'saliency_maps_{image_size}', f'{key}_saliency_avg.npy')
+            path = os.path.join(RESULTS_DIR, f'saliency_maps_rank_{image_size}', f'{key}_saliency_avg.npy')
             if os.path.exists(path):
                 saliency[key] = np.load(path)
 
