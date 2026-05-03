@@ -1,15 +1,14 @@
 """
+Generate saliency plots from pre-computed .npy files.
+Produces per-rank, all-ranks-combined, and pairwise-difference plots
+for the rank classifier saliency maps.
+
+Usage: python plot_rank_saliency_maps.py
+"""
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.config import DATA_DIR, RESULTS_DIR
-Regenerate saliency plots from existing .npy files.
-Creates 'all curves combined' plots by averaging per-rank saliency maps,
-and regenerates per-rank and difference plots.
-
-Usage: python regenerate_saliency_plots.py
-"""
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -71,7 +70,7 @@ def plot_enhanced_heatmap(map_data, title, filepath, image_size, cmap='hot'):
     plt.close()
 
 
-def regenerate_for_size(image_size):
+def plot_for_size(image_size):
     output_dir = os.path.join(RESULTS_DIR, f'saliency_maps_rank_{image_size}')
     if not os.path.exists(output_dir):
         print(f"Directory {output_dir} not found, skipping.")
@@ -156,5 +155,5 @@ def regenerate_for_size(image_size):
 
 
 if __name__ == "__main__":
-    regenerate_for_size(100)
-    regenerate_for_size(200)
+    plot_for_size(100)
+    plot_for_size(200)
