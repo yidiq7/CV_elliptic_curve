@@ -1,0 +1,24 @@
+# Environment
+.DS_Store
+.claude/
+__pycache__/
+*.pyc
+
+# Data and Artifacts
+*.txt
+*.csv
+*.npy
+*.out
+*.png
+*.jpg
+*.pdf
+
+# Output Directories
+experiments/
+experiments_old/
+saliency_maps_*/
+coloured/
+archive/
+
+# Paper (tracked elsewhere or ignored in this repo)
+Computer_vision_for_elliptic_curves/

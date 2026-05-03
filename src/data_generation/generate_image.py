@@ -1,4 +1,8 @@
 import numpy as np
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 from sympy import sympify, I, pi, exp
 import sympy
 import ast
@@ -18,7 +22,7 @@ SAVE_RGB_IMAGES = False
 
 primes = np.array([sympy.prime(i) for i in range(1, SIZE+1)])  # primes[0] = 2, primes[99] = 541
 
-with open("chiprimitive.txt", "r") as f:
+with open(os.path.join(DATA_DIR, 'chiprimitive.txt'), "r") as f:
     chifull_str = f.read().strip()
 
 chifull_str = chifull_str.replace("^", "**")
@@ -98,7 +102,7 @@ os.makedirs("./coloured", exist_ok=True)
 
 if GENERATE_REAL:
     aplist = []
-    with open('ap.csv', 'r') as csvfile:
+    with open(os.path.join(DATA_DIR, 'ap_nocm.csv'), 'r') as csvfile:
         reader = csv.reader(csvfile)
         header = next(reader)
         for row in reader:
@@ -110,7 +114,7 @@ if GENERATE_REAL:
     # Write directly to .npy file using memory-mapped array
     num_curves = len(aplist)
     combined_array = np.lib.format.open_memmap(
-        f"combined_twisted_arrays_{SIZE}.npy",
+        os.path.join(DATA_DIR, f"combined_twisted_arrays_{SIZE}.npy"),
         mode='w+',
         dtype=np.float32,
         shape=(num_curves, SIZE, SIZE, 2)
@@ -139,7 +143,7 @@ if GENERATE_REAL:
 
 if GENERATE_FAKE:
     # Count rows first to pre-allocate memory-mapped array
-    with open('fake_ap.csv', 'r', newline='') as f:
+    with open(os.path.join(DATA_DIR, 'fake_ap.csv'), 'r', newline='') as f:
         num_rows = sum(1 for _ in f)
     
     print(f"Loaded {num_rows} rows from fake_ap.csv")
@@ -155,7 +159,7 @@ if GENERATE_FAKE:
     # Process in batches to control memory usage
     BATCH_SIZE = 1000
     
-    with open('fake_ap.csv', 'r', newline='') as f:
+    with open(os.path.join(DATA_DIR, 'fake_ap.csv'), 'r', newline='') as f:
         reader = csv.reader(f)
         batch = []
         batch_start_idx = 0
@@ -188,3 +192,4 @@ if GENERATE_FAKE:
     # Flush to disk
     del combined_array_fake
     print(f"\nSaved {num_rows} fake curves to 'combined_twisted_arrays_fake.npy'")
+

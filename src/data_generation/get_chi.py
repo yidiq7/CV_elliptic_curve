@@ -1,8 +1,12 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 from sage.all import DirichletGroup
 
 # Set the maximum modulus
 N_max = 500
-output_filename = 'chifull_500.txt'
+output_filename = os.path.join(DATA_DIR, 'chifull_500.txt')
 
 # This will store all the character lists
 all_characters = []

@@ -1,4 +1,8 @@
 import numpy as np
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 from tqdm import tqdm
 from sympy import primerange
 from multiprocessing import Pool, cpu_count
@@ -77,7 +81,7 @@ if __name__ == "__main__":
     print(f"\nSuccessfully generated {len(results)} sequences.")
     
 
-    with open('fake_ap.csv', 'w', newline='') as f:
+    with open(os.path.join(DATA_DIR, 'fake_ap.csv'), 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerows(results)
     print("\nDataset saved to fake_ap_dataset.csv")

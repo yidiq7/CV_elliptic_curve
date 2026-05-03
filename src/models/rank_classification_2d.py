@@ -1,4 +1,8 @@
 import numpy as np
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -22,12 +26,12 @@ TRAIN_VAL_SPLIT_RATIO = 0.8
 IMAGE_SIZE = 100
 NUM_CLASSES = 3  # Ranks 0, 1, 2
 
-AP_CSV_PATH = 'ap.csv'
+AP_CSV_PATH = os.path.join(DATA_DIR, 'ap_nocm.csv')
 
 # --- 2. Data Loading ---
 
 def get_ranks_from_csv(csv_path):
-    """Read ranks from ap.csv. Row i (after header) corresponds to npy index i."""
+    """Read ranks from ap_nocm.csv. Row i (after header) corresponds to npy index i."""
     ranks = []
     with open(csv_path, 'r') as f:
         reader = csv.reader(f)
@@ -42,7 +46,7 @@ def get_ranks_from_csv(csv_path):
 
 
 def get_rank_indices(csv_path):
-    """Read ap.csv and return indices grouped by rank."""
+    """Read ap_nocm.csv and return indices grouped by rank."""
     rank_indices = {0: [], 1: [], 2: []}
     if not os.path.exists(csv_path):
         print(f"Warning: {csv_path} not found.")
@@ -261,7 +265,7 @@ def main():
     args = parser.parse_args()
 
     image_size = args.image_size
-    real_data_path = f'combined_twisted_arrays_{image_size}.npy'
+    real_data_path = os.path.join(DATA_DIR, f'combined_twisted_arrays_{image_size}.npy')
 
     # Load data
     if not os.path.exists(real_data_path):
@@ -454,7 +458,7 @@ def main():
 
     rank_indices = get_rank_indices(AP_CSV_PATH)
     if rank_indices is None:
-        print("Cannot generate saliency maps without ap.csv.")
+        print("Cannot generate saliency maps without ap_nocm.csv.")
         return
 
     for r in range(NUM_CLASSES):
@@ -494,7 +498,7 @@ def main():
             combined_sal = weighted if combined_sal is None else combined_sal + weighted
     if combined_sal is not None:
         saliency_results['all_combined'] = combined_sal
-        np.save(os.path.join(output_dir, 'all_combined_saliency_avg.npy'), combined_sal)
+        np.save(os.path.join(output_dir, os.path.join(RESULTS_DIR, 'all_combined_saliency_avg.npy')), combined_sal)
         print(f"Combined saliency computed (weighted by rank counts: {rank_counts})")
 
     # Generate plots

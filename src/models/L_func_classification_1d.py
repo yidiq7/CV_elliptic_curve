@@ -1,4 +1,8 @@
 import numpy as np
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -257,7 +261,7 @@ best_model_state = None
 
 if RESUME_TRAINING:
     try:
-        checkpoint = torch.load(f'L_function_classifier_1d_{IMAGE_SIZE}_checkpoint.pth', map_location=DEVICE)
+        checkpoint = torch.load(os.path.join(RESULTS_DIR, f'L_function_classifier_1d_{IMAGE_SIZE}_checkpoint.pth'), map_location=DEVICE)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         START_EPOCH = checkpoint['epoch']
@@ -381,7 +385,7 @@ checkpoint = {
     'optimizer_state_dict': optimizer.state_dict(),
     'best_val_f1_real': best_val_f1_real,
 }
-torch.save(checkpoint, f'L_function_classifier_1d_{IMAGE_SIZE}_checkpoint.pth')
+torch.save(checkpoint, os.path.join(RESULTS_DIR, f'L_function_classifier_1d_{IMAGE_SIZE}_checkpoint.pth'))
 print(f"\nCheckpoint saved to L_function_classifier_1d_{IMAGE_SIZE}_checkpoint.pth")
 
 # --- Final Evaluation with Confusion Matrix ---

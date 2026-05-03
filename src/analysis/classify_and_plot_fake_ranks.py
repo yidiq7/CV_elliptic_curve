@@ -1,4 +1,8 @@
 import torch
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader, random_split
@@ -153,8 +157,8 @@ class CNN(nn.Module):
 
 def main():
     parser = argparse.ArgumentParser(description='Train CNN on real data and predict ranks for fake data.')
-    parser.add_argument('--real_csv', type=str, default='ap.csv', help='Path to real data CSV')
-    parser.add_argument('--fake_csv', type=str, default='fake_ap.csv', help='Path to fake data CSV')
+    parser.add_argument('--real_csv', type=str, default=os.path.join(DATA_DIR, 'ap_nocm.csv'), help='Path to real data CSV')
+    parser.add_argument('--fake_csv', type=str, default=os.path.join(DATA_DIR, 'fake_ap.csv'), help='Path to fake data CSV')
     args = parser.parse_args()
 
     if not os.path.exists(args.real_csv):

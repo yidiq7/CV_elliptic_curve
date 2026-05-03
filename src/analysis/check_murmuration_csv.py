@@ -1,4 +1,8 @@
 import csv
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 import ast
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +16,7 @@ OUTPUT_PLOT = 'murmuration_plot_csv.png'
 
 def main():
     parser = argparse.ArgumentParser(description='Check murmuration in elliptic curve data.')
-    parser.add_argument('input_csv', nargs='?', default='ap.csv', help='Path to the input CSV file')
+    parser.add_argument('input_csv', nargs='?', default=os.path.join(DATA_DIR, 'ap_nocm.csv'), help='Path to the input CSV file')
     args = parser.parse_args()
     
     INPUT_CSV = args.input_csv

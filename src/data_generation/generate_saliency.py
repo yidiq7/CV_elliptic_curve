@@ -1,4 +1,8 @@
 import os
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config import DATA_DIR, RESULTS_DIR
 import csv
 import random
 import torch
@@ -120,7 +124,7 @@ def get_rank_indices(csv_path):
             except (ValueError, IndexError):
                 continue
                 
-    # Randomly shuffle indices to avoid bias (e.g., if ap.csv is sorted by conductor)
+    # Randomly shuffle indices to avoid bias (e.g., if ap_nocm.csv is sorted by conductor)
     random.seed(42)
     random.shuffle(rank0_indices)
     random.shuffle(rank1_indices)
@@ -130,10 +134,10 @@ def get_rank_indices(csv_path):
 def main():
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMAGE_SIZE = 100 
-    CHECKPOINT_PATH = f'L_function_classifier_{IMAGE_SIZE}_checkpoint.pth'
+    CHECKPOINT_PATH = os.path.join(RESULTS_DIR, f'L_function_classifier_{IMAGE_SIZE}_checkpoint.pth')
     REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
     FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
-    AP_CSV_PATH = 'ap.csv'
+    AP_CSV_PATH = os.path.join(DATA_DIR, 'ap_nocm.csv')
     NUM_SAMPLES = None # Set to None to use the entire dataset
     
     model = LFunctionCNN().to(DEVICE)
@@ -146,7 +150,7 @@ def main():
         return
 
     # Get indices for ranks
-    print("Reading ap.csv to separate ranks...")
+    print("Reading ap_nocm.csv to separate ranks...")
     rank0_indices, rank1_indices = get_rank_indices(AP_CSV_PATH)
     
     if rank0_indices is None:
@@ -182,7 +186,7 @@ def main():
     fake_saliency = compute_average_saliency(model, fake_loader, DEVICE, NUM_SAMPLES)
     
     # Create output directory
-    output_dir = f'saliency_maps_{IMAGE_SIZE}'
+    output_dir = os.path.join(DATA_DIR, f'saliency_maps_{IMAGE_SIZE}')
     os.makedirs(output_dir, exist_ok=True)
 
     # Save raw data
@@ -252,7 +256,11 @@ def main():
 
         # Use rect to ensure suptitle is not clipped or overlapped
         plt.tight_layout(rect=[0, 0, 1, 0.95])
-        plt.savefig(os.path.join(output_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300, bbox_inches='tight')
+        
+        # Save plots to RESULTS_DIR instead of DATA_DIR
+        plot_dir = os.path.join(RESULTS_DIR, f'saliency_maps_{IMAGE_SIZE}')
+        os.makedirs(plot_dir, exist_ok=True)
+        plt.savefig(os.path.join(plot_dir, f'enhanced_marginal_{filename_suffix}.png'), dpi=300, bbox_inches='tight')
         plt.close()
 
     print("Generating enhanced marginal heatmaps for Real Channel, Imag Channel, and Average...")
