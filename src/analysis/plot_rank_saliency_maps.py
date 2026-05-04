@@ -7,7 +7,8 @@ Usage: python plot_rank_saliency_maps.py
 """
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config import DATA_DIR, RESULTS_DIR
 import numpy as np
 import matplotlib.pyplot as plt

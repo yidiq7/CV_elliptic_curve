@@ -1,16 +1,15 @@
 import numpy as np
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config import DATA_DIR, RESULTS_DIR
 from sympy import sympify, I, pi, exp
 import sympy
 import ast
 from PIL import Image
-import os
 import re
 import csv
-import sys
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
@@ -98,7 +97,8 @@ def twisted_image_from_ap(ap, rgb=False):
         img_array = np.stack([r, b], axis=2)
     return img_array
 
-os.makedirs("./coloured", exist_ok=True)
+COLOURED_DIR = os.path.join(RESULTS_DIR, 'coloured')
+os.makedirs(COLOURED_DIR, exist_ok=True)
 
 if GENERATE_REAL:
     aplist = []
@@ -132,7 +132,7 @@ if GENERATE_REAL:
             img_array_clipped = np.clip(img_array, 0, 1)
             img_array_uint8 = (img_array_clipped * 255).astype(np.uint8)
             img = Image.fromarray(img_array_uint8, 'RGB')
-            img.save(f"./coloured/ECcoloured{i+1}_{SIZE}.png")
+            img.save(os.path.join(COLOURED_DIR, f"ECcoloured{i+1}_{SIZE}.png"))
             #if i == 2:
             #    break
 
@@ -150,7 +150,7 @@ if GENERATE_FAKE:
 
     # Create memory-mapped array
     combined_array_fake = np.lib.format.open_memmap(
-        f"combined_twisted_arrays_fake_{SIZE}.npy",
+        os.path.join(DATA_DIR, f"combined_twisted_arrays_fake_{SIZE}.npy"),
         mode='w+',
         dtype=np.float32,
         shape=(num_rows, SIZE, SIZE, 2)

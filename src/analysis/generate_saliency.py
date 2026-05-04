@@ -1,7 +1,7 @@
 import os
-import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config import DATA_DIR, RESULTS_DIR
 import csv
 import random
@@ -135,8 +135,8 @@ def main():
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMAGE_SIZE = 100 
     CHECKPOINT_PATH = os.path.join(RESULTS_DIR, f'L_function_classifier_{IMAGE_SIZE}_checkpoint.pth')
-    REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
-    FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
+    REAL_DATA_PATH = os.path.join(DATA_DIR, f'combined_twisted_arrays_{IMAGE_SIZE}.npy')
+    FAKE_DATA_PATH = os.path.join(DATA_DIR, f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy')
     AP_CSV_PATH = os.path.join(DATA_DIR, 'ap_nocm.csv')
     NUM_SAMPLES = None # Set to None to use the entire dataset
     
@@ -196,8 +196,6 @@ def main():
     if rank0_indices is not None:
         np.save(os.path.join(output_dir, 'rank0_saliency_avg.npy'), rank0_saliency)
         np.save(os.path.join(output_dir, 'rank1_saliency_avg.npy'), rank1_saliency)
-    
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     def plot_enhanced_heatmap(map_data, title, filename_suffix, cmap='hot'):
         # Axis 0 (Rows) = Primes, Axis 1 (Columns) = Twists

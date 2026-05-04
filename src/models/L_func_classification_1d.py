@@ -1,7 +1,8 @@
 import numpy as np
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.config import DATA_DIR, RESULTS_DIR
 import torch
 import torch.nn as nn
@@ -45,8 +46,8 @@ TRAIN_VAL_SPLIT_RATIO = args.split
 
 # File paths for your data
 IMAGE_SIZE = args.image_size
-REAL_DATA_PATH = f'combined_twisted_arrays_{IMAGE_SIZE}.npy'
-FAKE_DATA_PATH = f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy'
+REAL_DATA_PATH = os.path.join(DATA_DIR, f'combined_twisted_arrays_{IMAGE_SIZE}.npy')
+FAKE_DATA_PATH = os.path.join(DATA_DIR, f'combined_twisted_arrays_fake_{IMAGE_SIZE}.npy')
 
 # Class imbalance ratio (fake:real = 10:1)
 CLASS_WEIGHT_RATIO = args.weight_ratio
@@ -69,7 +70,6 @@ try:
     fake_data_mmap = np.load(FAKE_DATA_PATH, mmap_mode='r')
 except FileNotFoundError as e:
     print(f"Error loading data: {e}")
-    print("Please make sure the .npy files are in the same directory as the script.")
     exit()
 
 print(f"Real data shape: {real_data_mmap.shape}")

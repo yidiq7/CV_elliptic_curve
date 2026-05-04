@@ -1,11 +1,18 @@
 import csv
+import os
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+from src.config import DATA_DIR
+
+output_filename = os.path.join(DATA_DIR, 'ap_nocm.csv')
 
 lowerconductor = 1;
 upperconductor = 10000;
 names = [e.cremona_label() for e in CremonaDatabase().iter([
     lowerconductor..upperconductor])];
 
-with open('ap_nocm.csv', 'w', newline='') as csvfile:
+with open(output_filename, 'w', newline='') as csvfile:
     # Define the column headers
     fieldnames = ['Conductor', 'Rank', 'ap_coefficients']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
