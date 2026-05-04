@@ -16,7 +16,7 @@ from tqdm import tqdm
 #SIZE = 100
 SIZE = int(sys.argv[1])
 GENERATE_REAL = True 
-GENERATE_FAKE = False
+GENERATE_FAKE = True
 SAVE_RGB_IMAGES = False
 
 primes = np.array([sympy.prime(i) for i in range(1, SIZE+1)])  # primes[0] = 2, primes[99] = 541
