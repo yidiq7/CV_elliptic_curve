@@ -14,11 +14,16 @@ __pycache__/
 *.pdf
 
 # Output Directories
-experiments/
-experiments_old/
-saliency_maps_*/
-coloured/
 archive/
 
 # Paper (tracked elsewhere or ignored in this repo)
 Computer_vision_for_elliptic_curves/
+
+# Empty directory tracking
+data/*
+!data/.gitkeep
+plots/*
+!plots/.gitkeep
+results/*
+!results/.gitkeep
+
