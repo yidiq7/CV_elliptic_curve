@@ -4,6 +4,17 @@
 
 This repository applies convolutional neural networks to arithmetic data attached to elliptic curves over $\mathbb{Q}$ - in particular, sequences of Frobenius traces $a_p$ and their Dirichlet-twisted variants — to study problems such as distinguishing genuine $L$-function curves from synthetic data drawn from Sato–Tate distribution, classifying analytic rank, and probing what features the networks rely on using saliency maps.
 
+## Requirements
+
+The codebase requires Python 3 and the following packages:
+- `torch`
+- `numpy`
+- `sympy`
+- `matplotlib`
+- `tqdm`
+- `Pillow`
+- `sagemath` (for `get_chi.py` and `get_ap.py`)
+
 ## Repository layout
 
 ```
